@@ -8,6 +8,29 @@ const context = (extra = {}) => ({ fishVariant: 'withoutEggs', scoreLimit: 50,
 const state = (hands, extra = {}) => ({ hands: hands.map(maskOf), left: 6, right: 6,
   turn: 0, fisher: 1, forcedStart: null, ...extra });
 
+test('оценка памяти кеша учитывает живые записи, попадания и вытеснение поколений', () => {
+  const positions = [
+    state([['0-0'], ['0-2'], ['1-1'], ['2-2']]),
+    state([['0-1'], ['0-2'], ['1-1'], ['2-2']]),
+    state([['0-1'], ['0-3'], ['1-1'], ['2-2']]),
+  ];
+  const solver = createSolver(context(), undefined, { cacheEntries: 2 });
+  assert.equal(solver.stats().cacheBytesEstimate, 0);
+  solver.solve(positions[0]);
+  const first = solver.stats().cacheBytesEstimate;
+  assert.ok(Number.isInteger(first) && first > 0);
+  solver.solve(positions[0]);
+  assert.equal(solver.stats().cacheBytesEstimate, first);
+  solver.solve(positions[1]);
+  assert.ok(solver.stats().cacheBytesEstimate > first);
+  solver.solve(positions[2]);
+  assert.ok(solver.stats().evicted > 0);
+  const fresh = createSolver(context(), undefined, { cacheEntries: 2 });
+  fresh.solve(positions[1]); fresh.solve(positions[2]);
+  assert.equal(solver.stats().cacheBytesEstimate, fresh.stats().cacheBytesEstimate);
+  assert.equal(createSolver(context()).stats().cacheBytesEstimate, 0);
+});
+
 test('стоимость одиночного 0-0 считается отдельно от руки партнёра', () => {
   assert.equal(handPoints(maskOf(['0-0'])), 10);
   assert.equal(handPoints(maskOf(['0-0', '1-2'])), 3);

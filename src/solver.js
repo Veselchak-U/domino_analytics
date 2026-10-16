@@ -1,5 +1,9 @@
 import { applyMove, isTerminal, legalMoves, positionKey, settle } from './game.js';
 
+// Approximate owned storage, not process heap usage. V8 layouts may differ.
+const entryBytes = key => 48 + (typeof key === 'number' ? 16 : 24 + Math.ceil(key.length * 2 / 8) * 8);
+const resultBytes = result => 80 + 48 + 6 * (16 + Math.ceil(result.leaves.toString(16).length / 16) * 8);
+
 /** Memo owned by one deal and one scoring context; counters remain BigInt. */
 export function createSolver(context, onProgress = () => {}, { cacheEntries = 2000000 } = {}) {
   if (!Number.isInteger(cacheEntries) || cacheEntries < 2) throw new Error('Кеш должен вмещать минимум две позиции');
@@ -8,6 +12,7 @@ export function createSolver(context, onProgress = () => {}, { cacheEntries = 20
   const generationSize = Math.floor(cacheEntries / 2);
   let recent = new Map(), previous = new Map();
   const terminals = new Map();
+  let recentBytes = 0, previousBytes = 0, terminalBytes = 0;
   let hits = 0, nodes = 0, evicted = 0, lastReport = performance.now();
   const started = lastReport;
   function solve(s) {
@@ -26,6 +31,7 @@ export function createSolver(context, onProgress = () => {}, { cacheEntries = 20
         result = { leaves: 1n, wins, fish: outcome.reason === 'emptyHand' ? 0n : 1n,
           eggs: outcome.reason === 'eggs' ? 1n : 0n, minDepth: 0, depth: 0 };
         terminals.set(terminalKey, result);
+        terminalBytes += entryBytes(terminalKey) + resultBytes(result);
       }
     } else {
       result = { leaves: 0n, wins: [0n, 0n, 0n], fish: 0n, eggs: 0n, minDepth: Infinity, depth: 0 };
@@ -41,11 +47,15 @@ export function createSolver(context, onProgress = () => {}, { cacheEntries = 20
     if (recent.size >= generationSize) {
       evicted += previous.size;
       previous = recent; recent = new Map();
+      previousBytes = recentBytes; recentBytes = 0;
     }
     recent.set(key, result);
+    recentBytes += entryBytes(key) + (result.depth === 0 ? 0 : resultBytes(result));
     return result;
   }
-  function stats() { return { nodes, hits, cached: recent.size + previous.size, evicted, elapsedMs: Math.round(performance.now() - started) }; }
+  function stats() { return { nodes, hits, cached: recent.size + previous.size, evicted,
+    cacheBytesEstimate: recentBytes + previousBytes + terminalBytes,
+    elapsedMs: Math.round(performance.now() - started) }; }
   return { solve, stats };
 }
 export function percentage(numerator, denominator) {

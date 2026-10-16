@@ -95,7 +95,7 @@ export function createApp({ examplesDir = process.env.DOMINO_EXAMPLES_DIR ?? 'C:
           if (active.key === key) return json(res, 202, view(active));
           return json(res, 409, { error: 'Сначала отмените текущий расчёт' });
         }
-        const job = { id: randomUUID(), key, status: 'running', stats: { nodes: 0, hits: 0, elapsedMs: 0 } };
+        const job = { id: randomUUID(), key, status: 'running', stats: { nodes: 0, hits: 0, cached: 0, evicted: 0, cacheBytesEstimate: 0, elapsedMs: 0 } };
         const worker = new Worker(new URL('./worker.js', import.meta.url), { workerData: { text: game.text, round } });
         job.worker = worker; active = job;
         remember(jobs, job.id, job);
@@ -132,7 +132,7 @@ export function createApp({ examplesDir = process.env.DOMINO_EXAMPLES_DIR ?? 'C:
           return json(res, 200, view(job));
         }
       }
-      const assets = { '/': ['index.html', 'text/html'], '/app.js': ['app.js', 'text/javascript'], '/impact.js': ['impact.js', 'text/javascript'], '/style.css': ['style.css', 'text/css'] };
+      const assets = { '/': ['index.html', 'text/html'], '/app.js': ['app.js', 'text/javascript'], '/impact.js': ['impact.js', 'text/javascript'], '/format.js': ['format.js', 'text/javascript'], '/style.css': ['style.css', 'text/css'] };
       if (req.method === 'GET' && assets[route]) {
         const [file, type] = assets[route];
         const content = await readFile(path.join(PUBLIC, file));

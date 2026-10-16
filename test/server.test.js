@@ -17,6 +17,7 @@ test('локальный HTTP: проверка, worker, отмена, повт�
     assert.equal((await fetch(base)).status, 200);
     assert.equal((await fetch(base + '/app.js')).status, 200);
     assert.equal((await fetch(base + '/impact.js')).status, 200);
+    assert.equal((await fetch(base + '/format.js')).status, 200);
     assert.equal((await fetch(base, { headers: { Origin: 'https://other.example' } })).status, 403);
     assert.equal((await request('/api/import', { text: '{}' })).status, 400);
     assert.equal((await request('/api/example', { name: '../package.json' })).status, 400);
@@ -25,14 +26,17 @@ test('локальный HTTP: проверка, worker, отмена, повт�
     assert.equal(game.rounds.length, 1);
     const { data: cancelled } = await request('/api/analyze', { gameId: game.id, round: 1 });
     assert.equal(cancelled.status, 'running');
+    assert.equal(cancelled.stats.cacheBytesEstimate, 0);
     assert.equal((await request(`/api/jobs/${cancelled.id}`, undefined, 'DELETE')).data.status, 'cancelled');
     const { data: started } = await request('/api/analyze', { gameId: game.id, round: 1 });
     let job = started;
     while (job.status === 'running') {
+      assert.ok(Number.isInteger(job.stats.cacheBytesEstimate) && job.stats.cacheBytesEstimate >= 0);
       await new Promise(resolve => setTimeout(resolve, 100));
       job = (await request(`/api/jobs/${job.id}`)).data;
     }
     assert.equal(job.status, 'done', job.error);
+    assert.ok(job.stats.cacheBytesEstimate > 0);
     const { result } = job;
     assert.equal(result.base.leaves, '7328406');
     assert.equal(result.base.depth, 40);

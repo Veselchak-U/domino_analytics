@@ -1,11 +1,14 @@
 import { aggregateImpacts } from './impact.js';
+import { formatCacheSize } from './format.js';
 const $ = id => document.getElementById(id);
 const colors = ['#006f62', '#97560f', '#62519a'];
 const playerColors = ['#006f62', '#97560f', '#225b9c', '#76419a'];
 const classes = ['a', 'b', 'draw'];
 const nf = new Intl.NumberFormat('ru-RU');
+const navigationSuffixes = ['', '-history'];
 let game = null, analysis = null, stepIndex = 0, activeJob = null, busy = false;
 let roundAnalyses = new Map(), stopQueue = false;
+let backgroundCalculation = false;
 let chartWidth = 960;
 
 function element(tag, className, text) {
@@ -24,6 +27,7 @@ function setBusy(value) {
   for (const id of ['file', 'examples', 'demo', 'round', 'analyze']) $(id).disabled = value;
   for (const button of $('round-list').children) button.disabled = value;
   $('analyze-game').disabled = value;
+  updateRoundButtons();
 }
 async function api(url, data, method = data === undefined ? 'GET' : 'POST') {
   const response = await fetch(url, { method, ...(data === undefined ? {} : {
@@ -81,7 +85,9 @@ async function importSource(request, name) {
     analysis = null;
     $('dashboard').hidden = true; $('game-meta').hidden = false;
     $('source-name').textContent = name;
-    $('rules-label').textContent = `${game.fishVariant === 'withEggs' ? 'С яйцами' : 'Без яиц'} · до ${game.scoreLimit} · раундов: ${game.rounds.length}`;
+    const variant = `Козёл, 2x2, до ${game.scoreLimit}, ${game.fishVariant === 'withEggs' ? 'с яйцами' : 'без яиц'}`;
+    $('rules-label').textContent = variant;
+    $('game-variant').textContent = `Вариант игры: ${variant}`;
     $('round').replaceChildren(); $('round-list').replaceChildren();
     for (const round of game.rounds) {
       const option = element('option', '', `Раунд ${round.number} · ${round.moves} действий`);
@@ -103,7 +109,7 @@ async function startAnalysis() {
   $('dashboard').hidden = true; $('cancel').disabled = false;
   $('progress-text').textContent = 'Подготовка расчёта…';
   const round = Number($('round').value);
-  [...$('round-list').children].forEach((node, i) => node.classList.toggle('active', i === round - 1));
+  markSelectedRound(round);
   try {
     const job = await requestRound(round);
     if (job.status === 'error') throw new Error(job.error);
@@ -113,7 +119,7 @@ async function startAnalysis() {
     } else {
       analysis = job.result; stepIndex = 0;
       roundAnalyses.set(round, analysis);
-      renderAnalysis(job.cached); $('dashboard').hidden = false;
+      renderAnalysis(); $('dashboard').hidden = false;
     }
   } catch (e) { showMessage(e.message, true); $('welcome').hidden = false; }
   finally { activeJob = null; $('progress').hidden = true; setBusy(false); }
@@ -126,7 +132,7 @@ async function requestRound(round) {
   if (stopQueue && job.status === 'running') job = await api(`/api/jobs/${job.id}`, undefined, 'DELETE');
   while (job.status === 'running') {
     const stats = job.stats;
-    $('progress-text').textContent = `Раунд ${round} из ${game.rounds.length} · ${nf.format(stats.nodes)} позиций · ${nf.format(stats.hits)} из кеша · ${(stats.elapsedMs / 1000).toLocaleString('ru-RU', { maximumFractionDigits: 1 })} с`;
+    $('progress-text').textContent = `Раунд ${round} из ${game.rounds.length} · ${nf.format(stats.nodes)} позиций · ${nf.format(stats.hits)} из кеша · Кеш ≈ ${formatCacheSize(stats.cacheBytesEstimate ?? 0)} · ${(stats.elapsedMs / 1000).toLocaleString('ru-RU', { maximumFractionDigits: 1 })} с`;
     await new Promise(resolve => setTimeout(resolve, 500));
     job = await api(`/api/jobs/${job.id}`);
   }
@@ -137,7 +143,7 @@ async function requestRound(round) {
 async function analyzeGame() {
   if (!game || busy || roundAnalyses.size === game.rounds.length) return;
   showMessage('');
-  setBusy(true); stopQueue = false; $('progress').hidden = false; $('cancel').disabled = false;
+  backgroundCalculation = true; setBusy(true); stopQueue = false; $('progress').hidden = false; $('cancel').disabled = false;
   try {
     for (const round of game.rounds) {
       if (stopQueue) break;
@@ -150,7 +156,36 @@ async function analyzeGame() {
     }
     if (stopQueue) showMessage('Расчёт партии остановлен. Готовые итоги сохранены; можно досчитать оставшиеся раунды.');
   } catch (e) { showMessage(e.message, true); }
-  finally { activeJob = null; $('progress').hidden = true; setBusy(false); renderPlayerImpacts(); }
+  finally { activeJob = null; backgroundCalculation = false; $('progress').hidden = true; setBusy(false); renderPlayerImpacts(); }
+}
+
+function markSelectedRound(number) {
+  $('round').value = number;
+  [...$('round-list').children].forEach((node, i) => node.classList.toggle('active', i === number - 1));
+}
+
+function selectRound(number) {
+  if (!game || (busy && (!backgroundCalculation || !roundAnalyses.has(number)))) return;
+  markSelectedRound(number);
+  const ready = roundAnalyses.get(number);
+  if (!ready) { startAnalysis(); return; }
+  analysis = ready; stepIndex = 0; renderAnalysis();
+}
+
+function updateRoundButtons() {
+  for (const button of document.querySelectorAll('#player-impact-table button[data-round]')) {
+    button.disabled = busy && (!backgroundCalculation || !roundAnalyses.has(Number(button.dataset.round)));
+  }
+}
+
+function roundButton(number, text, label) {
+  const button = element('button', 'round-select-button', text);
+  button.type = 'button'; button.dataset.round = number;
+  button.setAttribute('aria-label', label ?? `Выбрать раунд ${number}`);
+  button.setAttribute('aria-pressed', String(number === analysis.number));
+  button.title = `${roundAnalyses.has(number) ? 'Открыть' : 'Рассчитать'} раунд ${number}`;
+  button.addEventListener('click', () => selectRound(number));
+  return button;
 }
 
 function renderPlayerImpacts() {
@@ -159,7 +194,10 @@ function renderPlayerImpacts() {
   $('analyze-game').hidden = summary.complete;
   const head = element('tr');
   head.append(element('th', '', 'Игрок'), element('th', '', 'Команда'));
-  for (const round of summary.byRound) head.append(element('th', round.number === analysis.number ? 'selected-round' : '', `Раунд ${round.number}`));
+  for (const round of summary.byRound) {
+    const cell = element('th', round.number === analysis.number ? 'selected-round' : '');
+    cell.append(roundButton(round.number, `Раунд ${round.number}`)); head.append(cell);
+  }
   head.append(element('th', '', 'Вся партия')); $('player-impact-head').replaceChildren(head);
   $('player-impact-body').replaceChildren();
   game.players.forEach((player, p) => {
@@ -170,15 +208,18 @@ function renderPlayerImpacts() {
     row.append(label, element('td', classes[p % 2], game.teams[p % 2]));
     for (const round of summary.byRound) {
       const value = round.values?.[p];
-      row.append(element('td', `${value < 0 ? 'negative' : 'positive'} ${round.number === analysis.number ? 'selected-round' : ''}`, value == null ? '—' : `${signed(value)} %`));
+      const cell = element('td', `${value < 0 ? 'negative' : 'positive'} ${round.number === analysis.number ? 'selected-round' : ''}`);
+      cell.append(roundButton(round.number, value == null ? '—' : `${signed(value)} %`, `Выбрать раунд ${round.number}, ${player.name}`));
+      row.append(cell);
     }
     const total = summary.totals[p];
     row.append(element('td', total < 0 ? 'negative' : 'positive', total === null ? '—' : `${signed(total)} %`));
     $('player-impact-body').append(row);
   });
+  updateRoundButtons();
 }
 
-function renderAnalysis(cached) {
+function renderAnalysis() {
   chartWidth = Math.max(960, (analysis.steps.length - 1) * 64 + 100);
   $('charts-canvas').style.minWidth = `${chartWidth}px`;
   $('chart').setAttribute('viewBox', `0 0 ${chartWidth} 240`);
@@ -192,9 +233,6 @@ function renderAnalysis(cached) {
   $('leaves').textContent = nf.format(BigInt(analysis.base.leaves));
   $('depth').textContent = analysis.base.depth;
   $('min-depth').textContent = analysis.base.minDepth;
-  $('round-title').textContent = `РАУНД ${analysis.number} · СЧЁТ ДО НАЧАЛА`;
-  $('initial-score').textContent = analysis.context.score.join(' : ');
-  $('calculation-info').textContent = cached ? 'Готовый результат из памяти' : `${nf.format(analysis.stats.nodes)} позиций · ${(analysis.stats.elapsedMs / 1000).toLocaleString('ru-RU', { maximumFractionDigits: 2 })} с`;
   $('legend').replaceChildren();
   for (let t = 0; t < 3; t++) {
     const item = element('span', 'legend-item'); item.append(element('i', `dot bg-${classes[t]}`), document.createTextNode(analysis.teams[t] ?? 'Ничья партии')); $('legend').append(item);
@@ -209,7 +247,7 @@ function renderAnalysis(cached) {
     const sample = element('i', `line-swatch worst-line-swatch ${classes[t]}`);
     item.append(sample, document.createTextNode(`Худший шанс · ${analysis.teams[t]}`)); $('legend').append(item);
   }
-  $('slider').max = analysis.steps.length - 1;
+  for (const suffix of navigationSuffixes) $(`slider${suffix}`).max = analysis.steps.length - 1;
   $('history-team-a').textContent = analysis.teams[0]; $('history-team-b').textContent = analysis.teams[1];
   $('history').replaceChildren();
   for (const step of analysis.steps) {
@@ -234,11 +272,13 @@ function selectStep(index) {
 }
 function renderStep() {
   const step = analysis.steps[stepIndex];
-  $('slider').value = stepIndex;
-  $('first').disabled = $('prev').disabled = stepIndex === 0;
-  $('last').disabled = $('next').disabled = stepIndex === analysis.steps.length - 1;
-  $('step-count').textContent = `ПОЗИЦИЯ ${stepIndex} / ${analysis.steps.length - 1}`;
-  $('move-title').textContent = step.move ? `${step.move.player} · ${actionText(step.move)}` : 'До первого хода · базовые шансы';
+  for (const suffix of navigationSuffixes) {
+    $(`slider${suffix}`).value = stepIndex;
+    $(`first${suffix}`).disabled = $(`prev${suffix}`).disabled = stepIndex === 0;
+    $(`last${suffix}`).disabled = $(`next${suffix}`).disabled = stepIndex === analysis.steps.length - 1;
+    $(`step-count${suffix}`).textContent = `ПОЗИЦИЯ ${stepIndex} / ${analysis.steps.length - 1}`;
+    $(`move-title${suffix}`).textContent = step.move ? `${step.move.player} · ${actionText(step.move)}` : 'До первого хода · базовые шансы';
+  }
   $('probabilities').replaceChildren();
   for (let t = 0; t < 3; t++) {
     const card = element('div', 'probability');
@@ -246,7 +286,7 @@ function renderStep() {
       element('small', '', `${nf.format(BigInt(step.wins[t]))} / ${nf.format(BigInt(step.leaves))} исходов из позиции ${stepIndex}`));
     $('probabilities').append(card);
   }
-  pair('delta', step.delta.map(v => signed(v)), ' п.п.'); pair('counts', step.counts); pair('points', step.points);
+  pair('delta', step.delta.map(v => signed(v)), ' п.п.');
   $('choices').textContent = step.alternatives.length;
   $('fish').textContent = percent(step.fishProbability);
   $('eggs').textContent = analysis.context.fishVariant === 'withEggs' ? `В том числе с яйцами: ${percent(step.eggsProbability)}` : 'Рыба без яиц';
@@ -364,9 +404,9 @@ function renderImpactChart() {
     const group = svgNode('g', { role: 'button', tabindex: 0, 'aria-label': description, 'data-step': i });
     group.append(svgNode('title', {}, description));
     if (i === stepIndex) group.append(svgNode('rect', { x: chartX(i) - 28, y: 217, width: 56, height: 133, rx: 5, fill: '#e5eee8' }));
-    if (best) group.append(svgNode('rect', { x: chartX(i) - 27, y: Math.min(y(best.value), y(0)), width: 14, height: Math.max(2, Math.abs(y(best.value) - y(0))), fill: `url(#best-hatch-${impact.player})`, stroke: color, 'stroke-width': 1, rx: 1, 'data-kind': 'best' }));
-    group.append(svgNode('rect', { x: chartX(i) - 7, y: Math.min(y(value), y(0)), width: 14, height: Math.max(2, Math.abs(y(value) - y(0))), fill: color, rx: 1, 'data-kind': 'actual' }));
-    if (worst) group.append(svgNode('rect', { x: chartX(i) + 13, y: Math.min(y(worst.value), y(0)), width: 14, height: Math.max(2, Math.abs(y(worst.value) - y(0))), fill: `url(#worst-dots-${impact.player})`, stroke: color, 'stroke-width': 1, rx: 1, 'data-kind': 'worst' }));
+    if (best) group.append(svgNode('rect', { x: chartX(i) - 21, y: Math.min(y(best.value), y(0)), width: 14, height: Math.max(2, Math.abs(y(best.value) - y(0))), fill: `url(#best-hatch-${impact.player})`, stroke: color, 'stroke-width': 1, 'data-kind': 'best' }));
+    group.append(svgNode('rect', { x: chartX(i) - 7, y: Math.min(y(value), y(0)), width: 14, height: Math.max(2, Math.abs(y(value) - y(0))), fill: color, 'data-kind': 'actual' }));
+    if (worst) group.append(svgNode('rect', { x: chartX(i) + 7, y: Math.min(y(worst.value), y(0)), width: 14, height: Math.max(2, Math.abs(y(worst.value) - y(0))), fill: `url(#worst-dots-${impact.player})`, stroke: color, 'stroke-width': 1, 'data-kind': 'worst' }));
     group.append(svgNode('text', { x: chartX(i), y: 235, 'text-anchor': 'middle', fill: color, 'font-size': 13 }, best ? signed(best.value) : '—'),
       svgNode('text', { x: chartX(i), y: 256, 'text-anchor': 'middle', fill: color, 'font-size': 13, 'font-weight': 600 }, signed(value)),
       svgNode('text', { x: chartX(i), y: 277, 'text-anchor': 'middle', fill: color, 'font-size': 13 }, worst ? signed(worst.value) : '—'),
@@ -409,11 +449,13 @@ $('cancel').addEventListener('click', async () => {
   try { await api(`/api/jobs/${activeJob}`, undefined, 'DELETE'); }
   catch (e) { showMessage(e.message, true); $('cancel').disabled = false; }
 });
-$('slider').addEventListener('input', () => selectStep(Number($('slider').value)));
-$('first').addEventListener('click', () => selectStep(0));
-$('last').addEventListener('click', () => selectStep(analysis.steps.length - 1));
-$('prev').addEventListener('click', () => selectStep(stepIndex - 1));
-$('next').addEventListener('click', () => selectStep(stepIndex + 1));
+for (const suffix of navigationSuffixes) {
+  $(`slider${suffix}`).addEventListener('input', () => selectStep(Number($(`slider${suffix}`).value)));
+  $(`first${suffix}`).addEventListener('click', () => selectStep(0));
+  $(`last${suffix}`).addEventListener('click', () => selectStep(analysis.steps.length - 1));
+  $(`prev${suffix}`).addEventListener('click', () => selectStep(stepIndex - 1));
+  $(`next${suffix}`).addEventListener('click', () => selectStep(stepIndex + 1));
+}
 document.addEventListener('keydown', event => {
   if (['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(event.target.tagName)) return;
   if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); selectStep(stepIndex + (event.key === 'ArrowRight' ? 1 : -1)); }
