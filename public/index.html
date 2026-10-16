@@ -19,8 +19,7 @@
     <select id="examples"><option value="">Выберите файл из out</option></select>
     <button id="demo" class="side-button">Открыть учебный пример ↗</button>
     <div id="game-meta" class="game-meta" hidden>
-      <div class="side-heading">ТЕКУЩАЯ ПАРТИЯ</div>
-      <p id="source-name" class="source-name"></p>
+      <p><span class="variant-label">Партия:</span><span id="source-name" class="source-name"></span></p>
       <p><span class="variant-label">Вариант игры:</span><span id="rules-label"></span></p>
       <label for="round" class="side-heading">РАУНД</label>
       <select id="round"></select>
@@ -29,7 +28,7 @@
     </div>
   </aside>
   <main>
-    <header class="topbar"><span id="game-variant">Вариант игры: выберите журнал</span><button id="theme-toggle" class="button secondary theme-toggle" type="button" aria-pressed="false" aria-label="Включить тёмную тему">☾ Тёмная тема</button></header>
+    <header class="topbar"><div class="game-heading"><span id="game-source" hidden></span><span id="game-variant">Вариант игры: выберите журнал</span></div><button id="theme-toggle" class="button secondary theme-toggle" type="button" aria-pressed="false" aria-label="Включить тёмную тему">☾ Тёмная тема</button></header>
     <div id="message" class="message" role="status" aria-live="polite" hidden></div>
     <section id="progress" class="progress-panel" hidden>
       <div class="progress-top"><div><strong>Строим полное дерево</strong><p id="progress-text">Подготовка расчёта…</p></div><button id="cancel" class="button secondary">Отменить</button></div>
@@ -72,14 +71,9 @@
         <div class="nav-buttons"><button id="first" class="button secondary" aria-label="К началу">⇤</button><button id="prev" class="button secondary" aria-label="Предыдущий ход">←</button><button id="next" class="button primary">Следующий ход →</button><button id="last" class="button secondary" aria-label="К концу">⇥</button></div>
         <input id="slider" type="range" min="0" max="1" value="0" aria-label="Шаг истории">
       </section>
-      <section class="metrics" aria-label="Дополнительная статистика">
-        <div class="metric"><span>Изменение шансов</span><strong id="delta"></strong><small>Относительно предыдущего действия</small></div>
-        <div class="metric"><span>Допустимых действий</span><strong id="choices"></strong><small>Без одинаковых продолжений</small></div>
-        <div class="metric"><span>Вероятность рыбы</span><strong id="fish"></strong><small id="eggs"></small></div>
-      </section>
       <div class="detail-grid">
         <section class="panel table-panel"><div class="section-top"><h2>Позиция на столе</h2><span id="turn-label" class="muted"></span></div><div id="chain" class="chain"></div><div id="ends" class="ends"></div><div id="hands" class="hands"></div><div id="outcome" class="outcome" hidden></div></section>
-        <section class="panel alternatives-panel"><div class="section-top"><h2>Возможные ходы</h2></div><p class="muted">Шансы после каждого допустимого действия. Метка «В игре» обозначает реальный выбор.</p><div id="alternatives"></div></section>
+        <section class="panel alternatives-panel"><div class="section-top"><h2>Возможные ходы</h2></div><p class="muted">Шансы после каждого допустимого действия. Влияние — изменение шанса команды ходящего игрока. Метка «В игре» обозначает реальный выбор.</p><div id="alternatives"></div></section>
       </div>
       <section class="navigator panel" aria-label="Навигация перед историей раунда">
         <div class="step-description"><span id="step-count-history" class="eyebrow">ПОЗИЦИЯ 0</span><strong id="move-title-history">До первого хода</strong></div>
@@ -90,8 +84,8 @@
       <section id="faq" class="panel explanation" aria-labelledby="faq-title"><h2 id="faq-title">FAQ</h2>
         <details class="faq-item"><summary>Как устроен расчёт и что означает победа при рыбе</summary><p>Одинаковые дочерние позиции объединяются. Зеркальные цепочки с одинаковыми руками, открытыми концами, очередью и рыбаком эквивалентны. Разные последовательности, позднее пришедшие к одинаковой позиции, сохраняют кратность конечных ветвей.</p><p>При рыбе, завершающей партию, побеждает победитель партии; окончательная ничья считается отдельно. При продолжающейся партии побеждает команда рыбака — последнего игрока, выложившего недубль. Это относится и к рыбе с яйцами. Начисления очков и исходный результат журнала проверяются по исходной спецификации.</p><p>Шаг 0 включает все допустимые заходы назначенного игрока. При первом раунде и счёте 0:0 заход обязателен с 1–1. Числа исходов точные, проценты округлены только для отображения.</p></details>
         <details class="faq-item"><summary>Как рассчитывается вероятность победы?</summary><p>Вероятность = выигрышные конечные ветви / все конечные ветви. Все ветви равновероятны. Это модель исходов раздачи, без предположения об оптимальной игре.</p></details>
-        <details class="faq-item"><summary>Что показывают пунктирные линии лучших ходов?</summary><p>Пунктир — лучший шанс каждой команды из позиции перед соответствующим реальным ходом. Максимумы A и B независимы: они могут достигаться разными ходами, поэтому их сумма может превышать 100%. Это не отдельный идеальный розыгрыш.</p></details>
-        <details class="faq-item"><summary>Что показывают точечные линии худших ходов?</summary><p>Линии из точек — худший шанс каждой команды среди допустимых ходов из той же реальной позиции. Минимумы A и B независимы и могут достигаться разными ходами. Это не отдельный розыгрыш самых плохих ходов.</p></details>
+        <details class="faq-item"><summary>Что показывают пунктирные линии лучших ходов?</summary><p>После хода своей команды пунктир показывает её лучший доступный шанс из позиции перед этим ходом. После хода соперника пунктир совпадает с фактической вероятностью команды после хода. Это сравнение вариантов из реальных позиций, а не отдельный идеальный розыгрыш.</p></details>
+        <details class="faq-item"><summary>Что показывают точечные линии худших ходов?</summary><p>После хода своей команды линия из точек показывает её худший доступный шанс из позиции перед этим ходом. После хода соперника она совпадает с фактической вероятностью команды: все три её линии в этой точке совпадают. Это не отдельный розыгрыш самых плохих ходов.</p></details>
         <details class="faq-item"><summary>Как считается импакт хода?</summary><p>Импакт = шанс своей команды после хода − до хода. Плюс — улучшение, минус — ухудшение. Разница 50% → 60% обозначается +10%; это не относительный прирост.</p></details>
       </section>
     </div>

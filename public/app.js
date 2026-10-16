@@ -1,5 +1,6 @@
-import { aggregateImpacts } from './impact.js';
+import { aggregateImpacts, alternativeImpact, rankAlternatives, comparisonChance } from './impact.js';
 import { formatCacheSize } from './format.js';
+import { revealChartStep } from './navigation.js';
 const $ = id => document.getElementById(id);
 const colors = ['var(--a)', 'var(--b)', 'var(--draw)'];
 const playerColors = ['var(--a)', 'var(--b)', 'var(--player-c)', 'var(--player-d)'];
@@ -10,6 +11,7 @@ let game = null, analysis = null, stepIndex = 0, activeJob = null, busy = false;
 let roundAnalyses = new Map(), stopQueue = false;
 let backgroundCalculation = false;
 let chartWidth = 960;
+const chartInsets = { left: 120, right: 40 };
 
 function element(tag, className, text) {
   const node = document.createElement(tag);
@@ -68,13 +70,6 @@ function domino(stone) {
   }
   return node;
 }
-function pair(target, values, suffix = '') {
-  const node = $(target); node.replaceChildren();
-  for (let t = 0; t < 2; t++) {
-    if (t) node.append(document.createTextNode(' / '));
-    node.append(element('span', classes[t], `${values[t]}${suffix}`));
-  }
-}
 
 async function importSource(request, name) {
   if (busy) return;
@@ -85,7 +80,9 @@ async function importSource(request, name) {
     analysis = null;
     $('dashboard').hidden = true; $('game-meta').hidden = false;
     $('source-name').textContent = name;
-    const variant = `Козёл, 2x2, до ${game.scoreLimit}, ${game.fishVariant === 'withEggs' ? 'с яйцами' : 'без яиц'}`;
+    $('game-source').textContent = `Партия: ${name}`;
+    $('game-source').hidden = false;
+    const variant = `Козёл, 2x2, до ${game.scoreLimit} ${game.scoreLimit === 101 ? 'очка' : 'очков'}, ${game.fishVariant === 'withEggs' ? 'с яйцами' : 'без яиц'}`;
     $('rules-label').textContent = variant;
     $('game-variant').textContent = `Вариант игры: ${variant}`;
     $('round').replaceChildren(); $('round-list').replaceChildren();
@@ -220,14 +217,15 @@ function renderPlayerImpacts() {
 }
 
 function renderAnalysis() {
-  chartWidth = Math.max(960, (analysis.steps.length - 1) * 64 + 100);
+  chartWidth = Math.max(960, (analysis.steps.length - 1) * 64 + chartInsets.left + chartInsets.right);
   $('charts-canvas').style.minWidth = `${chartWidth}px`;
   $('chart').setAttribute('viewBox', `0 0 ${chartWidth} 240`);
   $('impact-chart').setAttribute('viewBox', `0 0 ${chartWidth} 365`);
   $('player-legend').replaceChildren();
   analysis.players.forEach((p, i) => {
     const item = element('span', 'legend-item');
-    const badge = element('span', 'player-badge', `P${i + 1}`); badge.style.color = playerColors[i];
+    item.style.color = colors[i % 2];
+    const badge = element('span', 'player-badge', `P${i + 1}`);
     item.append(badge, document.createTextNode(p.name)); $('player-legend').append(item);
   });
   $('leaves').textContent = nf.format(BigInt(analysis.base.leaves));
@@ -269,6 +267,7 @@ function renderAnalysis() {
 function selectStep(index) {
   if (!analysis) return;
   stepIndex = Math.max(0, Math.min(analysis.steps.length - 1, index)); renderStep();
+  revealChartStep($('charts-canvas').parentElement, $('impact-chart').querySelector(`[data-step="${stepIndex}"]`));
 }
 function renderStep() {
   const step = analysis.steps[stepIndex];
@@ -286,10 +285,6 @@ function renderStep() {
       element('small', '', `${nf.format(BigInt(step.wins[t]))} / ${nf.format(BigInt(step.leaves))} исходов из позиции ${stepIndex}`));
     $('probabilities').append(card);
   }
-  pair('delta', step.delta.map(v => signed(v)), ' п.п.');
-  $('choices').textContent = step.alternatives.length;
-  $('fish').textContent = percent(step.fishProbability);
-  $('eggs').textContent = analysis.context.fishVariant === 'withEggs' ? `В том числе с яйцами: ${percent(step.eggsProbability)}` : 'Рыба без яиц';
   $('turn-label').textContent = step.terminal ? 'Раунд завершён' : `Ходит: ${analysis.players[step.turn].name}`;
   $('chain').replaceChildren(...(step.chain.length ? step.chain.map(domino) : [element('span', 'chain-empty', 'Цепочка ещё не начата')]));
   $('ends').textContent = step.ends.length ? `Открытые концы: ${step.ends.join(' и ')}${step.fisher >= 0 ? ` · Последний недубль: ${analysis.players[step.fisher].name}` : ''}` : `Заходит: ${analysis.players[step.turn].name}`;
@@ -308,10 +303,12 @@ function renderStep() {
       element('div', 'muted', `Победитель раунда по исходным правилам: ${o.winnerTeam === null ? 'не назначается' : analysis.teams[o.winnerTeam]}. Завершил: ${analysis.players[o.finishedPlayer].name}.`));
   }
   $('alternatives').replaceChildren();
-  for (const alternative of step.alternatives) {
+  for (const alternative of rankAlternatives(step)) {
     const card = element('div', 'alternative'), head = element('div', 'alternative-head');
     if (alternative.stone) head.append(domino(alternative.stone));
     head.append(element('span', '', actionText(alternative)));
+    const impact = alternativeImpact(step, alternative);
+    head.append(element('span', `alternative-impact ${impact > 0 ? 'positive' : impact < 0 ? 'negative' : ''}`, `Влияние ${signed(impact)} %`));
     if (alternative.actual) head.append(element('span', 'actual', 'В игре'));
     const chances = element('div', 'alt-chances');
     for (let t = 0; t < 2; t++) chances.append(element('span', classes[t], percent(alternative.probabilities[t], alternative.wins[t], alternative.leaves)));
@@ -336,7 +333,7 @@ function renderChart() {
   const x = chartX;
   const y = p => 210 - p * 1.9;
   for (const p of [0, 25, 50, 75, 100]) {
-    chart.append(svgNode('line', { x1: 80, x2: chartWidth - 20, y1: y(p), y2: y(p), stroke: 'var(--line)', 'stroke-dasharray': '3 5' }), svgNode('text', { x: 65, y: y(p) + 5, 'text-anchor': 'end', fill: 'var(--muted)', 'font-size': 14 }, percent(p)));
+    chart.append(svgNode('line', { x1: chartInsets.left, x2: chartWidth - chartInsets.right, y1: y(p), y2: y(p), stroke: 'var(--line)', 'stroke-dasharray': '3 5' }), svgNode('text', { x: 65, y: y(p) + 5, 'text-anchor': 'end', fill: 'var(--muted)', 'font-size': 14 }, percent(p)));
   }
   for (let t = 0; t < 3; t++) {
     if (t === 2 && analysis.steps.every(s => s.wins[2] === '0')) continue;
@@ -344,25 +341,25 @@ function renderChart() {
     chart.append(svgNode('path', { d, fill: 'none', stroke: colors[t], 'stroke-width': 2.5, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }));
   }
   for (let t = 0; t < 2; t++) {
-    const d = analysis.steps.map((s, i) => `${i ? 'L' : 'M'}${x(i)},${y(s.best.probabilities[t])}`).join(' ');
+    const d = analysis.steps.map((s, i) => `${i ? 'L' : 'M'}${x(i)},${y(comparisonChance(s, t, 'best').probability)}`).join(' ');
     const line = svgNode('path', { d, fill: 'none', stroke: colors[t], 'stroke-width': 2.5,
       'stroke-dasharray': '8 6', 'stroke-linejoin': 'round', 'data-best-team': t });
     line.append(svgNode('title', {}, `Лучший доступный шанс · ${analysis.teams[t]}`)); chart.append(line);
   }
   for (let t = 0; t < 2; t++) {
-    const d = analysis.steps.map((s, i) => `${i ? 'L' : 'M'}${x(i)},${y(s.worst.probabilities[t])}`).join(' ');
+    const d = analysis.steps.map((s, i) => `${i ? 'L' : 'M'}${x(i)},${y(comparisonChance(s, t, 'worst').probability)}`).join(' ');
     const line = svgNode('path', { d, fill: 'none', stroke: colors[t], 'stroke-width': 2.5,
       'stroke-dasharray': '1 7', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'data-worst-team': t });
     line.append(svgNode('title', {}, `Худший доступный шанс · ${analysis.teams[t]}`)); chart.append(line);
   }
   const selected = analysis.steps[stepIndex];
-  $('best-chances').textContent = `${stepIndex ? 'Лучшие шансы перед этим действием' : 'Базовые шансы'}: ` + analysis.teams.map((name, t) => {
-    const choice = selected.best.moves[t];
-    return `${name} ${percent(selected.best.probabilities[t], choice?.wins[t] ?? selected.wins[t], choice?.leaves ?? selected.leaves)}`;
+  $('best-chances').textContent = `${stepIndex ? 'Лучший шанс (на чужом ходе — факт)' : 'Базовые шансы'}: ` + analysis.teams.map((name, t) => {
+    const chance = comparisonChance(selected, t, 'best');
+    return `${name} ${percent(chance.probability, chance.wins, chance.leaves)}`;
   }).join(' · ');
-  $('worst-chances').textContent = `${stepIndex ? 'Худшие шансы перед этим действием' : 'Базовые шансы'}: ` + analysis.teams.map((name, t) => {
-    const choice = selected.worst.moves[t];
-    return `${name} ${percent(selected.worst.probabilities[t], choice?.wins[t] ?? selected.wins[t], choice?.leaves ?? selected.leaves)}`;
+  $('worst-chances').textContent = `${stepIndex ? 'Худший шанс (на чужом ходе — факт)' : 'Базовые шансы'}: ` + analysis.teams.map((name, t) => {
+    const chance = comparisonChance(selected, t, 'worst');
+    return `${name} ${percent(chance.probability, chance.wins, chance.leaves)}`;
   }).join(' · ');
   chart.append(svgNode('line', { x1: x(stepIndex), x2: x(stepIndex), y1: 14, y2: 218, stroke: 'var(--axis)', 'stroke-dasharray': '4 4' }));
   for (let t = 0; t < 2; t++) chart.append(svgNode('circle', { cx: x(stepIndex), cy: y(analysis.steps[stepIndex].probabilities[t]), r: 5, fill: colors[t], stroke: 'var(--surface)', 'stroke-width': 2 }));
@@ -371,11 +368,12 @@ function renderChart() {
       chart.append(svgNode('text', { x: x(i), y: 236, 'text-anchor': 'middle', fill: 'var(--muted)', 'font-size': 14 }, i));
   }
 }
-function chartX(i) { return 80 + i / (analysis.steps.length - 1) * (chartWidth - 100); }
+function chartX(i) { return chartInsets.left + i / (analysis.steps.length - 1) * (chartWidth - chartInsets.left - chartInsets.right); }
 function renderImpactChart() {
   const chart = $('impact-chart'); chart.replaceChildren();
   const defs = svgNode('defs', {});
-  playerColors.forEach((color, p) => {
+  analysis.players.forEach((_, p) => {
+    const color = colors[p % 2];
     const pattern = svgNode('pattern', { id: `best-hatch-${p}`, width: 7, height: 7, patternUnits: 'userSpaceOnUse' });
     pattern.append(svgNode('rect', { width: 7, height: 7, fill: 'var(--surface)' }),
       svgNode('path', { d: 'M-2,2 L2,-2 M0,7 L7,0 M5,9 L9,5', stroke: color, 'stroke-width': 1.5 }));
@@ -389,7 +387,7 @@ function renderImpactChart() {
   const max = Math.max(10, ...analysis.steps.map(s => Math.max(Math.abs(s.impact?.value ?? 0), Math.abs(s.best.impact?.value ?? 0), Math.abs(s.worst.impact?.value ?? 0))));
   const y = v => 118 - v / max * 82;
   for (const value of [-max, 0, max]) {
-    chart.append(svgNode('line', { x1: 80, x2: chartWidth - 20, y1: y(value), y2: y(value), stroke: value === 0 ? 'var(--axis)' : 'var(--line)', 'stroke-dasharray': value === 0 ? 'none' : '3 5' }),
+    chart.append(svgNode('line', { x1: chartInsets.left, x2: chartWidth - chartInsets.right, y1: y(value), y2: y(value), stroke: value === 0 ? 'var(--axis)' : 'var(--line)', 'stroke-dasharray': value === 0 ? 'none' : '3 5' }),
       svgNode('text', { x: 65, y: y(value) + 5, 'text-anchor': 'end', fill: 'var(--muted)', 'font-size': 13 }, `${signed(value)}%`));
   }
   chart.append(svgNode('text', { x: 65, y: 235, 'text-anchor': 'end', fill: 'var(--muted)', 'font-size': 12 }, 'Лучший'));
@@ -399,7 +397,7 @@ function renderImpactChart() {
   analysis.steps.forEach((step, i) => {
     const impact = step.impact, value = impact?.value ?? 0;
     const best = step.best.impact, worst = step.worst.impact;
-    const color = impact ? playerColors[impact.player] : 'var(--muted)';
+    const color = impact ? colors[impact.player % 2] : 'var(--muted)';
     const description = impact ? `Ход ${i}. P${impact.player + 1}: ${analysis.players[impact.player].name}. Лучший ${signed(best.value)} %: ${actionText(best.move)}. Факт ${signed(value)} %. Худший вероятный ход ${signed(worst.value)} %: ${actionText(worst.move)}` : 'Шаг 0. До первого хода. Влияние 0,00 %. Альтернативных действий нет';
     const group = svgNode('g', { role: 'button', tabindex: 0, 'aria-label': description, 'data-step': i });
     group.append(svgNode('title', {}, description));
@@ -411,7 +409,7 @@ function renderImpactChart() {
       svgNode('text', { x: chartX(i), y: 256, 'text-anchor': 'middle', fill: color, 'font-size': 13, 'font-weight': 600 }, signed(value)),
       svgNode('text', { x: chartX(i), y: 277, 'text-anchor': 'middle', fill: color, 'font-size': 13 }, worst ? signed(worst.value) : '—'),
       svgNode('text', { x: chartX(i), y: 307, 'text-anchor': 'middle', fill: color, 'font-size': 14, 'font-weight': 700 }, impact ? `P${impact.player + 1}` : '—'),
-      svgNode('text', { x: chartX(i), y: 336, 'text-anchor': 'middle', fill: 'var(--muted)', 'font-size': 14 }, i));
+      svgNode('text', { x: chartX(i), y: 336, 'text-anchor': 'middle', fill: color, 'font-size': 14 }, i));
     group.addEventListener('click', e => { e.stopPropagation(); selectStep(i); });
     group.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectStep(i); } });
     chart.append(group);
@@ -419,12 +417,13 @@ function renderImpactChart() {
   const current = analysis.steps[stepIndex].impact;
   const best = analysis.steps[stepIndex].best.impact;
   const worst = analysis.steps[stepIndex].worst.impact;
+  $('impact-selection').style.color = current ? colors[current.player % 2] : 'var(--muted)';
   $('impact-selection').textContent = current ? `Ход ${stepIndex} · P${current.player + 1} ${analysis.players[current.player].name} · лучший ${signed(best.value)} % (${actionText(best.move)}) · факт ${signed(current.value)} % · худший ${signed(worst.value)} % (${actionText(worst.move)})` : 'До первого хода · влияние 0,00 %';
 }
 for (const id of ['chart', 'impact-chart']) $(id).addEventListener('click', event => {
   if (!analysis) return;
   const bounds = $(id).getBoundingClientRect();
-  selectStep(Math.round(((event.clientX - bounds.left) / bounds.width * chartWidth - 80) / (chartWidth - 100) * (analysis.steps.length - 1)));
+  selectStep(Math.round(((event.clientX - bounds.left) / bounds.width * chartWidth - chartInsets.left) / (chartWidth - chartInsets.left - chartInsets.right) * (analysis.steps.length - 1)));
 });
 $('file').addEventListener('change', async () => {
   const file = $('file').files[0];

@@ -1,9 +1,102 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { attributeImpacts, aggregateImpacts, bestOptionsAtSteps, worstOptionsAtSteps } from '../public/impact.js';
+import { attributeImpacts, aggregateImpacts, bestOptionsAtSteps, worstOptionsAtSteps, alternativeImpact, rankAlternatives, comparisonChance } from '../public/impact.js';
 const players = ['Анна', 'Борис', 'Вера', 'Глеб'].map((name, i) => ({ name, seat: i + 1 }));
 const alternative = (stone, wins, leaves = '100') => ({ action: 'left', stone,
   wins: wins.map(String), leaves, probabilities: wins.map(w => Number(w) / Number(leaves) * 100) });
+
+test('дополнительные точки отличаются только на ходе своей команды, автор не равен очереди', () => {
+  for (const player of [0, 1, 2, 3]) {
+    const step = { impact: { player }, turn: (player + 1) % 4,
+      probabilities: [40, 60, 0], wins: ['40', '60', '0'], leaves: '100',
+      best: { probabilities: [70, 90], moves: [alternative('1-2', [70, 30, 0]), alternative('1-3', [10, 90, 0])] },
+      worst: { probabilities: [20, 30], moves: [alternative('1-4', [20, 80, 0]), alternative('1-5', [70, 30, 0])] } };
+    const original = structuredClone(step), own = player % 2, other = 1 - own;
+    assert.equal(comparisonChance(step, own, 'best').probability, own ? 90 : 70);
+    assert.equal(comparisonChance(step, own, 'worst').probability, own ? 30 : 20);
+    for (const kind of ['best', 'worst']) assert.deepEqual(comparisonChance(step, other, kind), {
+      probability: step.probabilities[other], wins: step.wins[other], leaves: '100',
+    });
+    assert.deepEqual(step, original);
+  }
+});
+
+test('точки начала и вынужденного хода совпадают, на последнем ходе чужая команда показывает факт', () => {
+  const base = { impact: null, probabilities: [40, 60, 0], wins: ['40', '60', '0'], leaves: '100' };
+  for (const kind of ['best', 'worst']) for (const team of [0, 1]) {
+    assert.equal(comparisonChance(base, team, kind).probability, base.probabilities[team]);
+  }
+  const forced = { ...base, impact: { player: 1 },
+    best: { probabilities: [40, 60], moves: [base, base] }, worst: { probabilities: [40, 60], moves: [base, base] } };
+  for (const kind of ['best', 'worst']) for (const team of [0, 1]) {
+    assert.equal(comparisonChance(forced, team, kind).probability, base.probabilities[team]);
+  }
+  const last = { impact: { player: 2 }, probabilities: [100, 0, 0], wins: ['1', '0', '0'], leaves: '1',
+    worst: { probabilities: [20, 10], moves: [alternative('1-2', [20, 80, 0]), alternative('1-3', [90, 10, 0])] } };
+  assert.equal(comparisonChance(last, 0, 'worst').probability, 20);
+  assert.deepEqual(comparisonChance(last, 1, 'worst'), { probability: 0, wins: '0', leaves: '1' });
+});
+
+test('подписи используют точные счётчики отображённой альтернативы или фактической позиции', () => {
+  const chosen = alternative('1-2', ['9007199254740993', '9007199254740992', '0'], '18014398509481985');
+  const step = { impact: { player: 0 }, probabilities: [60, 40, 0], wins: ['6', '4', '0'], leaves: '10',
+    best: { probabilities: [50, 90], moves: [chosen, alternative('1-3', [10, 90, 0])] } };
+  assert.deepEqual(comparisonChance(step, 0, 'best'), { probability: 50, wins: '9007199254740993', leaves: '18014398509481985' });
+  assert.deepEqual(comparisonChance(step, 1, 'best'), { probability: 40, wins: '4', leaves: '10' });
+});
+
+test('варианты сортируются от лучшего к худшему для команды любого места, реальный ход участвует наравне', () => {
+  const bad = { ...alternative('1-2', [30, 70, 0]), actual: true };
+  const good = alternative('1-3', [70, 30, 0]);
+  const middle = alternative('1-4', [50, 50, 0]);
+  const alternatives = [bad, good, middle];
+  for (const turn of [0, 2]) assert.deepEqual(rankAlternatives({ turn, alternatives }), [good, middle, bad]);
+  for (const turn of [1, 3]) assert.deepEqual(rankAlternatives({ turn, alternatives }), [bad, middle, good]);
+  assert.deepEqual(alternatives, [bad, good, middle]);
+});
+
+test('среди отрицательных влияний первым идёт наименьшее ухудшение', () => {
+  const step = { turn: 0, probabilities: [60, 40, 0], alternatives: [
+    alternative('1-2', [45, 55, 0]), alternative('1-3', [55, 45, 0]), alternative('1-4', [50, 50, 0]),
+  ] };
+  assert.deepEqual(rankAlternatives(step).map(a => alternativeImpact(step, a)), [-5, -10, -15]);
+});
+
+test('сортировка точная при одинаковых округлённых шансах и разных знаменателях', () => {
+  const low = alternative('1-2', ['9007199254740992', '9007199254740993', '0'], '18014398509481985');
+  const high = alternative('1-3', ['9007199254740993', '9007199254740992', '0'], '18014398509481985');
+  low.probabilities = high.probabilities = [50, 50, 0];
+  const smallerCountBetter = alternative('1-4', [2, 1, 0], '3');
+  assert.deepEqual(rankAlternatives({ turn: 0, alternatives: [low, high, smallerCountBetter] }), [smallerCountBetter, high, low]);
+});
+
+test('равные шансы сохраняют порядок, единственный пас и завершённая позиция поддерживаются', () => {
+  const first = alternative('1-2', [1, 1, 0], '2');
+  const second = { ...alternative('1-3', [50, 50, 0]), actual: true };
+  assert.deepEqual(rankAlternatives({ turn: 0, alternatives: [first, second] }), [first, second]);
+  const pass = { ...first, action: 'pass', stone: undefined };
+  assert.deepEqual(rankAlternatives({ turn: 1, alternatives: [pass] }), [pass]);
+  assert.deepEqual(rankAlternatives({ turn: 0, alternatives: [] }), []);
+});
+
+test('влияние альтернативы считается для следующего игрока всех четырёх мест', () => {
+  for (const turn of [0, 2]) {
+    const step = { turn, probabilities: [60, 35, 5] };
+    assert.equal(alternativeImpact(step, { probabilities: [70, 20, 10] }), 10);
+    assert.equal(alternativeImpact(step, { probabilities: [45, 50, 5] }), -15);
+  }
+  for (const turn of [1, 3]) {
+    const step = { turn, probabilities: [35, 60, 5] };
+    assert.equal(alternativeImpact(step, { probabilities: [20, 70, 10] }), 10);
+    assert.equal(alternativeImpact(step, { probabilities: [50, 45, 5] }), -15);
+  }
+});
+
+test('влияние единственного хода и паса нулевое, точность малых изменений сохранена', () => {
+  const step = { turn: 1, probabilities: [62.1212, 37.8788, 0] };
+  for (const action of ['pass', 'left']) assert.equal(alternativeImpact(step, { action, probabilities: step.probabilities }), 0);
+  assert.equal(alternativeImpact(step, { probabilities: [62.1209, 37.8791, 0] }), 0.0003);
+});
 
 test('худшие шансы независимы, шаг 0 сохраняет базу, последний берёт предыдущие альтернативы', () => {
   const result = worstOptionsAtSteps([

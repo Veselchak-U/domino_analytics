@@ -1,5 +1,30 @@
 const units = value => Math.round(value * 10000) || 0;
 
+/** Display extrema only for the author of this action; use actual odds for the other team. */
+export function comparisonChance(step, team, kind) {
+  if (!step.impact || step.impact.player % 2 !== team) {
+    return { probability: step.probabilities[team], wins: step.wins[team], leaves: step.leaves };
+  }
+  const comparison = step[kind], move = comparison.moves[team];
+  return { probability: comparison.probabilities[team], wins: move.wins[team], leaves: move.leaves };
+}
+
+/** Change in the next player's team chance from the currently selected position. */
+export function alternativeImpact(step, alternative) {
+  const team = step.turn % 2;
+  return units(alternative.probabilities[team] - step.probabilities[team]) / 10000;
+}
+
+/** A shared baseline makes descending team win probability also descending impact. */
+export function rankAlternatives(step) {
+  const team = step.turn % 2;
+  return step.alternatives.toSorted((a, b) => {
+    const left = BigInt(a.wins[team]) * BigInt(b.leaves);
+    const right = BigInt(b.wins[team]) * BigInt(a.leaves);
+    return left > right ? -1 : left < right ? 1 : 0;
+  });
+}
+
 /** Independent maxima from the position before each recorded action. */
 export function bestOptionsAtSteps(steps, players) {
   return optionsAtSteps(steps, players, false);

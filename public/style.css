@@ -18,7 +18,7 @@ main{margin-left:254px;width:calc(100% - 254px);max-width:1800px;padding:0 42px}
 .brand-sub{letter-spacing:.6px;white-space:normal}.brand>span:last-child{min-width:0}
 .variant-label{display:block;margin-bottom:5px;font-weight:600}
 .topbar{height:auto;min-height:80px;padding:18px 0;line-height:1.6;letter-spacing:.4px;font-size:14px}
-#game-variant{overflow-wrap:anywhere;font-size:clamp(18px,1.5vw,22px);font-weight:400}
+#game-source,#game-variant{overflow-wrap:anywhere;font-size:clamp(18px,1.5vw,22px);font-weight:400}
 .round-select-button{font:inherit;color:inherit;background:none;border:0;padding:0;min-height:26px;width:100%;text-align:inherit;cursor:pointer}.round-select-button:hover:not(:disabled){text-decoration:underline;text-underline-offset:3px}.round-select-button:disabled{cursor:wait}.round-select-button[aria-pressed="true"]{font-weight:700}th .round-select-button{text-decoration:underline;text-underline-offset:3px}
 .explanation>summary{font-size:16px}.faq-item{border-top:1px solid var(--line);margin-top:14px;padding-top:14px}.faq-item p{margin:12px 0 0}.faq-item summary{line-height:1.6}main{padding-bottom:24px}
 .overview{grid-template-columns:1fr 1.5fr}.move-range-values{display:flex;justify-content:space-between;gap:16px}.move-range-values .move-range{flex-direction:row;align-items:baseline;gap:6px;white-space:nowrap}.move-range-values strong{font-size:24px}
@@ -44,8 +44,11 @@ main{min-width:0}.section-top{flex-wrap:wrap}table{font-variant-numeric:tabular-
 .sidebar{color-scheme:dark}
 .primary{background:#006f62}
 .topbar{gap:16px;flex-wrap:wrap}
-#game-variant{flex:1 1 300px}
+.game-heading{flex:1 1 300px;min-width:0;display:flex;flex-direction:column;gap:4px}
 .theme-toggle{flex:0 0 auto;min-height:44px;white-space:nowrap;letter-spacing:0}
+.alternative-head{flex-wrap:wrap}
+.alternative-head .actual{margin-left:auto}
+.alternative-impact{white-space:nowrap;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums}
 .explanation>h2{color:var(--ink);font-size:20px}
 .overview{grid-template-columns:minmax(0,1fr) auto;align-items:stretch}
 .move-range-card{width:max-content;max-width:520px}
