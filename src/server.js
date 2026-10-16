@@ -132,7 +132,7 @@ export function createApp({ examplesDir = process.env.DOMINO_EXAMPLES_DIR ?? 'C:
           return json(res, 200, view(job));
         }
       }
-      const assets = { '/': ['index.html', 'text/html'], '/app.js': ['app.js', 'text/javascript'], '/impact.js': ['impact.js', 'text/javascript'], '/format.js': ['format.js', 'text/javascript'], '/style.css': ['style.css', 'text/css'] };
+      const assets = { '/': ['index.html', 'text/html'], '/app.js': ['app.js', 'text/javascript'], '/theme.js': ['theme.js', 'text/javascript'], '/impact.js': ['impact.js', 'text/javascript'], '/format.js': ['format.js', 'text/javascript'], '/style.css': ['style.css', 'text/css'] };
       if (req.method === 'GET' && assets[route]) {
         const [file, type] = assets[route];
         const content = await readFile(path.join(PUBLIC, file));

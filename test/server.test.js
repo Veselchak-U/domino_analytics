@@ -16,6 +16,9 @@ test('локальный HTTP: проверка, worker, отмена, повт�
   try {
     assert.equal((await fetch(base)).status, 200);
     assert.equal((await fetch(base + '/app.js')).status, 200);
+    const theme = await fetch(base + '/theme.js');
+    assert.equal(theme.status, 200);
+    assert.match(theme.headers.get('content-type'), /text\/javascript/);
     assert.equal((await fetch(base + '/impact.js')).status, 200);
     assert.equal((await fetch(base + '/format.js')).status, 200);
     assert.equal((await fetch(base, { headers: { Origin: 'https://other.example' } })).status, 403);

@@ -1,8 +1,8 @@
 import { aggregateImpacts } from './impact.js';
 import { formatCacheSize } from './format.js';
 const $ = id => document.getElementById(id);
-const colors = ['#006f62', '#97560f', '#62519a'];
-const playerColors = ['#006f62', '#97560f', '#225b9c', '#76419a'];
+const colors = ['var(--a)', 'var(--b)', 'var(--draw)'];
+const playerColors = ['var(--a)', 'var(--b)', 'var(--player-c)', 'var(--player-d)'];
 const classes = ['a', 'b', 'draw'];
 const nf = new Intl.NumberFormat('ru-RU');
 const navigationSuffixes = ['', '-history'];
@@ -336,7 +336,7 @@ function renderChart() {
   const x = chartX;
   const y = p => 210 - p * 1.9;
   for (const p of [0, 25, 50, 75, 100]) {
-    chart.append(svgNode('line', { x1: 80, x2: chartWidth - 20, y1: y(p), y2: y(p), stroke: '#d5ded8', 'stroke-dasharray': '3 5' }), svgNode('text', { x: 65, y: y(p) + 5, 'text-anchor': 'end', fill: '#52626a', 'font-size': 14 }, percent(p)));
+    chart.append(svgNode('line', { x1: 80, x2: chartWidth - 20, y1: y(p), y2: y(p), stroke: 'var(--line)', 'stroke-dasharray': '3 5' }), svgNode('text', { x: 65, y: y(p) + 5, 'text-anchor': 'end', fill: 'var(--muted)', 'font-size': 14 }, percent(p)));
   }
   for (let t = 0; t < 3; t++) {
     if (t === 2 && analysis.steps.every(s => s.wins[2] === '0')) continue;
@@ -364,11 +364,11 @@ function renderChart() {
     const choice = selected.worst.moves[t];
     return `${name} ${percent(selected.worst.probabilities[t], choice?.wins[t] ?? selected.wins[t], choice?.leaves ?? selected.leaves)}`;
   }).join(' · ');
-  chart.append(svgNode('line', { x1: x(stepIndex), x2: x(stepIndex), y1: 14, y2: 218, stroke: '#839a8b', 'stroke-dasharray': '4 4' }));
-  for (let t = 0; t < 2; t++) chart.append(svgNode('circle', { cx: x(stepIndex), cy: y(analysis.steps[stepIndex].probabilities[t]), r: 5, fill: colors[t], stroke: 'white', 'stroke-width': 2 }));
+  chart.append(svgNode('line', { x1: x(stepIndex), x2: x(stepIndex), y1: 14, y2: 218, stroke: 'var(--axis)', 'stroke-dasharray': '4 4' }));
+  for (let t = 0; t < 2; t++) chart.append(svgNode('circle', { cx: x(stepIndex), cy: y(analysis.steps[stepIndex].probabilities[t]), r: 5, fill: colors[t], stroke: 'var(--surface)', 'stroke-width': 2 }));
   for (let i = 0; i < analysis.steps.length; i++) {
     if (i % Math.max(1, Math.round(analysis.steps.length / 15)) === 0 || i === analysis.steps.length - 1)
-      chart.append(svgNode('text', { x: x(i), y: 236, 'text-anchor': 'middle', fill: '#52626a', 'font-size': 14 }, i));
+      chart.append(svgNode('text', { x: x(i), y: 236, 'text-anchor': 'middle', fill: 'var(--muted)', 'font-size': 14 }, i));
   }
 }
 function chartX(i) { return 80 + i / (analysis.steps.length - 1) * (chartWidth - 100); }
@@ -377,11 +377,11 @@ function renderImpactChart() {
   const defs = svgNode('defs', {});
   playerColors.forEach((color, p) => {
     const pattern = svgNode('pattern', { id: `best-hatch-${p}`, width: 7, height: 7, patternUnits: 'userSpaceOnUse' });
-    pattern.append(svgNode('rect', { width: 7, height: 7, fill: '#fff' }),
+    pattern.append(svgNode('rect', { width: 7, height: 7, fill: 'var(--surface)' }),
       svgNode('path', { d: 'M-2,2 L2,-2 M0,7 L7,0 M5,9 L9,5', stroke: color, 'stroke-width': 1.5 }));
     defs.append(pattern);
     const dots = svgNode('pattern', { id: `worst-dots-${p}`, width: 6, height: 6, patternUnits: 'userSpaceOnUse' });
-    dots.append(svgNode('rect', { width: 6, height: 6, fill: '#fff' }),
+    dots.append(svgNode('rect', { width: 6, height: 6, fill: 'var(--surface)' }),
       svgNode('circle', { cx: 3, cy: 3, r: 1.3, fill: color }));
     defs.append(dots);
   });
@@ -389,21 +389,21 @@ function renderImpactChart() {
   const max = Math.max(10, ...analysis.steps.map(s => Math.max(Math.abs(s.impact?.value ?? 0), Math.abs(s.best.impact?.value ?? 0), Math.abs(s.worst.impact?.value ?? 0))));
   const y = v => 118 - v / max * 82;
   for (const value of [-max, 0, max]) {
-    chart.append(svgNode('line', { x1: 80, x2: chartWidth - 20, y1: y(value), y2: y(value), stroke: value === 0 ? '#71847a' : '#d5ded8', 'stroke-dasharray': value === 0 ? 'none' : '3 5' }),
-      svgNode('text', { x: 65, y: y(value) + 5, 'text-anchor': 'end', fill: '#52626a', 'font-size': 13 }, `${signed(value)}%`));
+    chart.append(svgNode('line', { x1: 80, x2: chartWidth - 20, y1: y(value), y2: y(value), stroke: value === 0 ? 'var(--axis)' : 'var(--line)', 'stroke-dasharray': value === 0 ? 'none' : '3 5' }),
+      svgNode('text', { x: 65, y: y(value) + 5, 'text-anchor': 'end', fill: 'var(--muted)', 'font-size': 13 }, `${signed(value)}%`));
   }
-  chart.append(svgNode('text', { x: 65, y: 235, 'text-anchor': 'end', fill: '#52626a', 'font-size': 12 }, 'Лучший'));
-  chart.append(svgNode('text', { x: 65, y: 256, 'text-anchor': 'end', fill: '#52626a', 'font-size': 12 }, 'Факт'));
-  chart.append(svgNode('text', { x: 65, y: 277, 'text-anchor': 'end', fill: '#52626a', 'font-size': 12 }, 'Худший'));
-  chart.append(svgNode('line', { x1: chartX(stepIndex), x2: chartX(stepIndex), y1: 20, y2: 350, stroke: '#52626a', 'stroke-dasharray': '4 4' }));
+  chart.append(svgNode('text', { x: 65, y: 235, 'text-anchor': 'end', fill: 'var(--muted)', 'font-size': 12 }, 'Лучший'));
+  chart.append(svgNode('text', { x: 65, y: 256, 'text-anchor': 'end', fill: 'var(--muted)', 'font-size': 12 }, 'Факт'));
+  chart.append(svgNode('text', { x: 65, y: 277, 'text-anchor': 'end', fill: 'var(--muted)', 'font-size': 12 }, 'Худший'));
+  chart.append(svgNode('line', { x1: chartX(stepIndex), x2: chartX(stepIndex), y1: 20, y2: 350, stroke: 'var(--muted)', 'stroke-dasharray': '4 4' }));
   analysis.steps.forEach((step, i) => {
     const impact = step.impact, value = impact?.value ?? 0;
     const best = step.best.impact, worst = step.worst.impact;
-    const color = impact ? playerColors[impact.player] : '#52626a';
+    const color = impact ? playerColors[impact.player] : 'var(--muted)';
     const description = impact ? `Ход ${i}. P${impact.player + 1}: ${analysis.players[impact.player].name}. Лучший ${signed(best.value)} %: ${actionText(best.move)}. Факт ${signed(value)} %. Худший вероятный ход ${signed(worst.value)} %: ${actionText(worst.move)}` : 'Шаг 0. До первого хода. Влияние 0,00 %. Альтернативных действий нет';
     const group = svgNode('g', { role: 'button', tabindex: 0, 'aria-label': description, 'data-step': i });
     group.append(svgNode('title', {}, description));
-    if (i === stepIndex) group.append(svgNode('rect', { x: chartX(i) - 28, y: 217, width: 56, height: 133, rx: 5, fill: '#e5eee8' }));
+    if (i === stepIndex) group.append(svgNode('rect', { x: chartX(i) - 28, y: 217, width: 56, height: 133, rx: 5, fill: 'var(--highlight)' }));
     if (best) group.append(svgNode('rect', { x: chartX(i) - 21, y: Math.min(y(best.value), y(0)), width: 14, height: Math.max(2, Math.abs(y(best.value) - y(0))), fill: `url(#best-hatch-${impact.player})`, stroke: color, 'stroke-width': 1, 'data-kind': 'best' }));
     group.append(svgNode('rect', { x: chartX(i) - 7, y: Math.min(y(value), y(0)), width: 14, height: Math.max(2, Math.abs(y(value) - y(0))), fill: color, 'data-kind': 'actual' }));
     if (worst) group.append(svgNode('rect', { x: chartX(i) + 7, y: Math.min(y(worst.value), y(0)), width: 14, height: Math.max(2, Math.abs(y(worst.value) - y(0))), fill: `url(#worst-dots-${impact.player})`, stroke: color, 'stroke-width': 1, 'data-kind': 'worst' }));
@@ -411,7 +411,7 @@ function renderImpactChart() {
       svgNode('text', { x: chartX(i), y: 256, 'text-anchor': 'middle', fill: color, 'font-size': 13, 'font-weight': 600 }, signed(value)),
       svgNode('text', { x: chartX(i), y: 277, 'text-anchor': 'middle', fill: color, 'font-size': 13 }, worst ? signed(worst.value) : '—'),
       svgNode('text', { x: chartX(i), y: 307, 'text-anchor': 'middle', fill: color, 'font-size': 14, 'font-weight': 700 }, impact ? `P${impact.player + 1}` : '—'),
-      svgNode('text', { x: chartX(i), y: 336, 'text-anchor': 'middle', fill: '#52626a', 'font-size': 14 }, i));
+      svgNode('text', { x: chartX(i), y: 336, 'text-anchor': 'middle', fill: 'var(--muted)', 'font-size': 14 }, i));
     group.addEventListener('click', e => { e.stopPropagation(); selectStep(i); });
     group.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectStep(i); } });
     chart.append(group);

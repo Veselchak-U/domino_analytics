@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="description" content="Точный анализ ходов командного домино: вероятности, история и альтернативы.">
   <title>Домино · Аналитика</title>
+  <script src="/theme.js"></script>
   <link rel="stylesheet" href="/style.css">
   <script type="module" src="/app.js"></script>
 </head>
@@ -28,7 +29,7 @@
     </div>
   </aside>
   <main>
-    <header class="topbar"><span id="game-variant">Вариант игры: выберите журнал</span></header>
+    <header class="topbar"><span id="game-variant">Вариант игры: выберите журнал</span><button id="theme-toggle" class="button secondary theme-toggle" type="button" aria-pressed="false" aria-label="Включить тёмную тему">☾ Тёмная тема</button></header>
     <div id="message" class="message" role="status" aria-live="polite" hidden></div>
     <section id="progress" class="progress-panel" hidden>
       <div class="progress-top"><div><strong>Строим полное дерево</strong><p id="progress-text">Подготовка расчёта…</p></div><button id="cancel" class="button secondary">Отменить</button></div>
@@ -41,8 +42,8 @@
       <div class="welcome-features"><span>01 &nbsp; Полное дерево</span><span>02 &nbsp; История ходов</span><span>03 &nbsp; Сравнение альтернатив</span></div>
     </section>
     <div id="dashboard" hidden>
-      <section class="panel player-impact-panel" aria-label="Итоговый импакт игроков">
-        <div class="section-top"><div><p class="eyebrow">ВКЛАД В ШАНСЫ СВОЕЙ КОМАНДЫ</p><h2>Импакт игроков по раундам и партии</h2></div><button id="analyze-game" class="button secondary">Досчитать всю партию</button></div>
+      <section class="panel player-impact-panel" aria-label="Влияние игроков по раундам и партии">
+        <div class="section-top"><h2>Влияние игроков по раундам и партии</h2><button id="analyze-game" class="button secondary">Досчитать всю партию</button></div>
         <p id="impact-status" class="muted" aria-live="polite"></p>
         <div class="history-scroll"><table id="player-impact-table"><thead id="player-impact-head"></thead><tbody id="player-impact-body"></tbody></table></div>
         <p class="formula">Сумма изменений после собственных ходов игрока за весь раунд, независимо от выбранного шага. Итог партии — сумма всех раундов; пока не все раунды рассчитаны, итог обозначен прочерком.</p>
@@ -86,13 +87,13 @@
         <input id="slider-history" type="range" min="0" max="1" value="0" aria-label="Шаг истории перед таблицей">
       </section>
       <section class="panel history-panel"><div class="section-top"><h2>История раунда</h2><span class="muted">Нажмите на строку, чтобы перейти к ходу</span></div><div class="history-scroll"><table><thead><tr><th>Шаг</th><th>Игрок / действие</th><th id="history-team-a">Команда A</th><th id="history-team-b">Команда B</th><th>Изменение A</th><th>Ничья партии</th></tr></thead><tbody id="history"></tbody></table></div></section>
-      <details id="faq" class="panel explanation"><summary>FAQ</summary>
+      <section id="faq" class="panel explanation" aria-labelledby="faq-title"><h2 id="faq-title">FAQ</h2>
         <details class="faq-item"><summary>Как устроен расчёт и что означает победа при рыбе</summary><p>Одинаковые дочерние позиции объединяются. Зеркальные цепочки с одинаковыми руками, открытыми концами, очередью и рыбаком эквивалентны. Разные последовательности, позднее пришедшие к одинаковой позиции, сохраняют кратность конечных ветвей.</p><p>При рыбе, завершающей партию, побеждает победитель партии; окончательная ничья считается отдельно. При продолжающейся партии побеждает команда рыбака — последнего игрока, выложившего недубль. Это относится и к рыбе с яйцами. Начисления очков и исходный результат журнала проверяются по исходной спецификации.</p><p>Шаг 0 включает все допустимые заходы назначенного игрока. При первом раунде и счёте 0:0 заход обязателен с 1–1. Числа исходов точные, проценты округлены только для отображения.</p></details>
         <details class="faq-item"><summary>Как рассчитывается вероятность победы?</summary><p>Вероятность = выигрышные конечные ветви / все конечные ветви. Все ветви равновероятны. Это модель исходов раздачи, без предположения об оптимальной игре.</p></details>
         <details class="faq-item"><summary>Что показывают пунктирные линии лучших ходов?</summary><p>Пунктир — лучший шанс каждой команды из позиции перед соответствующим реальным ходом. Максимумы A и B независимы: они могут достигаться разными ходами, поэтому их сумма может превышать 100%. Это не отдельный идеальный розыгрыш.</p></details>
         <details class="faq-item"><summary>Что показывают точечные линии худших ходов?</summary><p>Линии из точек — худший шанс каждой команды среди допустимых ходов из той же реальной позиции. Минимумы A и B независимы и могут достигаться разными ходами. Это не отдельный розыгрыш самых плохих ходов.</p></details>
         <details class="faq-item"><summary>Как считается импакт хода?</summary><p>Импакт = шанс своей команды после хода − до хода. Плюс — улучшение, минус — ухудшение. Разница 50% → 60% обозначается +10%; это не относительный прирост.</p></details>
-      </details>
+      </section>
     </div>
   </main>
 </body>
