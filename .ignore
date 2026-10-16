@@ -1,0 +1,5 @@
+node_modules/
+.analysis/
+tools/ast-index/
+contracts/
+openspec/

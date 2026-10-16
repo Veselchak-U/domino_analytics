@@ -1,0 +1,498 @@
+[
+  {
+    "name": "2026-09-28-13-58-source-001-game-001.json",
+    "sha256": "91bcbeeaf71cb655435968e7a8cba4e14a86e37fdd205b4448346300a087f800",
+    "rounds": [
+      {
+        "number": 1,
+        "leaves": "6688786",
+        "wins": [
+          "3012453",
+          "3676327",
+          "6"
+        ],
+        "depth": 44,
+        "probabilities": [
+          45.0374,
+          54.9625,
+          0.0001
+        ],
+        "fishProbability": 18.1586,
+        "eggsProbability": 0,
+        "stats": {
+          "nodes": 2033934,
+          "hits": 791328,
+          "cached": 2033934,
+          "elapsedMs": 3087
+        },
+        "verification": "Полный перебор до ограничения кеша; точность ограниченного кеша дополнительно проверена тестом без кеша"
+      },
+      {
+        "number": 2,
+        "leaves": "64064752",
+        "wins": [
+          "24970301",
+          "39094405",
+          "46"
+        ],
+        "depth": 42,
+        "probabilities": [
+          38.9767,
+          61.0233,
+          0.0001
+        ],
+        "fishProbability": 18.1219,
+        "eggsProbability": 0,
+        "stats": {
+          "nodes": 9714465,
+          "hits": 4341520,
+          "cached": 9714465,
+          "elapsedMs": 22621
+        },
+        "verification": "Полный перебор до ограничения кеша; точность ограниченного кеша дополнительно проверена тестом без кеша"
+      },
+      {
+        "number": 3,
+        "leaves": "85584917",
+        "wins": [
+          "28774706",
+          "56810211",
+          "0"
+        ],
+        "depth": 43,
+        "probabilities": [
+          33.6212,
+          66.3788,
+          0
+        ],
+        "fishProbability": 18.8903,
+        "eggsProbability": 0,
+        "stats": {
+          "nodes": 12153924,
+          "hits": 5817931,
+          "cached": 12153924,
+          "elapsedMs": 31176
+        },
+        "verification": "Полный перебор до ограничения кеша; точность ограниченного кеша дополнительно проверена тестом без кеша"
+      }
+    ],
+    "valid": true
+  },
+  {
+    "name": "2026-09-28-20-45-source-001-game-001.json",
+    "sha256": "d18fcf24d990bd85cc961547eab9299450e8c5c73cd53fe51cedd21ca4e94e92",
+    "rounds": [
+      {
+        "number": 1,
+        "leaves": "16698268",
+        "wins": [
+          "10462459",
+          "6235806",
+          "3"
+        ],
+        "depth": 43,
+        "probabilities": [
+          62.656,
+          37.344,
+          0
+        ],
+        "fishProbability": 15.5146,
+        "eggsProbability": 0,
+        "stats": {
+          "nodes": 5383096,
+          "hits": 2238108,
+          "cached": 5383096,
+          "elapsedMs": 9355
+        },
+        "verification": "Полный перебор до ограничения кеша; точность ограниченного кеша дополнительно проверена тестом без кеша"
+      },
+      {
+        "number": 2,
+        "leaves": "32714252",
+        "wins": [
+          "13464209",
+          "19250043",
+          "0"
+        ],
+        "depth": 44,
+        "probabilities": [
+          41.157,
+          58.843,
+          0
+        ],
+        "fishProbability": 15.581,
+        "eggsProbability": 0,
+        "stats": {
+          "nodes": 9722540,
+          "hits": 4063075,
+          "cached": 9722540,
+          "elapsedMs": 21883
+        },
+        "verification": "Полный перебор до ограничения кеша; точность ограниченного кеша дополнительно проверена тестом без кеша"
+      },
+      {
+        "number": 3,
+        "leaves": "57389109",
+        "wins": [
+          "23257584",
+          "34131525",
+          "0"
+        ],
+        "depth": 42,
+        "probabilities": [
+          40.5261,
+          59.4739,
+          0
+        ],
+        "fishProbability": 17.6603,
+        "eggsProbability": 0,
+        "stats": {
+          "nodes": 8372932,
+          "hits": 3907931,
+          "cached": 8372932,
+          "elapsedMs": 17042
+        },
+        "verification": "Полный перебор до ограничения кеша; точность ограниченного кеша дополнительно проверена тестом без кеша"
+      }
+    ],
+    "valid": true
+  },
+  {
+    "name": "2026-09-28-20-52-source-001-game-001.json",
+    "sha256": "89bf9e119b47e98c1560cdaa33f76c81e197d62d7849cffba4ceb9661263a54a",
+    "rounds": [
+      {
+        "number": 1,
+        "leaves": "5430833",
+        "wins": [
+          "2696673",
+          "2734152",
+          "8"
+        ],
+        "depth": 44,
+        "probabilities": [
+          49.6549,
+          50.345,
+          0.0001
+        ],
+        "fishProbability": 16.5746,
+        "eggsProbability": 0,
+        "stats": {
+          "nodes": 2047388,
+          "hits": 729661,
+          "cached": 2047388,
+          "elapsedMs": 3119
+        },
+        "verification": "Полный перебор до ограничения кеша; точность ограниченного кеша дополнительно проверена тестом без кеша"
+      },
+      {
+        "number": 2,
+        "leaves": "54390802",
+        "wins": [
+          "28420376",
+          "25952669",
+          "17757"
+        ],
+        "depth": 42,
+        "probabilities": [
+          52.2522,
+          47.7152,
+          0.0326
+        ],
+        "fishProbability": 18.7101,
+        "eggsProbability": 0,
+        "stats": {
+          "nodes": 9319208,
+          "hits": 4058356,
+          "cached": 9319208,
+          "elapsedMs": 20759
+        },
+        "verification": "Полный перебор до ограничения кеша; точность ограниченного кеша дополнительно проверена тестом без кеша"
+      }
+    ],
+    "valid": true
+  },
+  {
+    "name": "2026-09-29-14-41-source-001-game-001.json",
+    "sha256": "4ae1124e14cf4ecde7219cff997eafdffb94ab796a4b721ee800f40967eab351",
+    "rounds": [
+      {
+        "number": 1,
+        "leaves": "9915512",
+        "wins": [
+          "6506497",
+          "3409015",
+          "0"
+        ],
+        "depth": 43,
+        "probabilities": [
+          65.6194,
+          34.3806,
+          0
+        ],
+        "fishProbability": 16.1995,
+        "eggsProbability": 0,
+        "stats": {
+          "nodes": 3342185,
+          "hits": 1321148,
+          "cached": 3342185,
+          "elapsedMs": 6169
+        },
+        "verification": "Полный перебор до ограничения кеша; точность ограниченного кеша дополнительно проверена тестом без кеша"
+      },
+      {
+        "number": 2,
+        "leaves": "61931607",
+        "wins": [
+          "42206571",
+          "19724413",
+          "623"
+        ],
+        "depth": 45,
+        "probabilities": [
+          68.1503,
+          31.8487,
+          0.001
+        ],
+        "fishProbability": 16.8084,
+        "eggsProbability": 0,
+        "stats": {
+          "nodes": 9675066,
+          "hits": 4165716,
+          "cached": 9675066,
+          "elapsedMs": 22192
+        },
+        "verification": "Полный перебор до ограничения кеша; точность ограниченного кеша дополнительно проверена тестом без кеша"
+      }
+    ],
+    "valid": true
+  },
+  {
+    "name": "2026-10-01-13-41-source-008-game-001.json",
+    "sha256": "d9e795c00b8722fe51a0bf1346c31b358e8ae8ae3fd7ff9ac07bd4d1ee86f6af",
+    "rounds": [
+      {
+        "number": 1,
+        "leaves": "3325648",
+        "wins": [
+          "1838118",
+          "1487524",
+          "6"
+        ],
+        "depth": 45,
+        "probabilities": [
+          55.271,
+          44.7288,
+          0.0002
+        ],
+        "fishProbability": 15.0776,
+        "eggsProbability": 0,
+        "stats": {
+          "nodes": 1961356,
+          "hits": 685920,
+          "cached": 1961356,
+          "elapsedMs": 2926
+        },
+        "verification": "Полный перебор до ограничения кеша; точность ограниченного кеша дополнительно проверена тестом без кеша"
+      },
+      {
+        "number": 2,
+        "leaves": "79756816",
+        "wins": [
+          "40158504",
+          "39598312",
+          "0"
+        ],
+        "depth": 48,
+        "probabilities": [
+          50.3512,
+          49.6488,
+          0
+        ],
+        "fishProbability": 18.1926,
+        "eggsProbability": 0,
+        "stats": {
+          "nodes": 12067281,
+          "hits": 5542266,
+          "cached": 12067281,
+          "elapsedMs": 30445
+        },
+        "verification": "Полный перебор до ограничения кеша; точность ограниченного кеша дополнительно проверена тестом без кеша"
+      },
+      {
+        "number": 3,
+        "leaves": "60877259",
+        "wins": [
+          "31072109",
+          "29805150",
+          "0"
+        ],
+        "depth": 45,
+        "probabilities": [
+          51.0406,
+          48.9594,
+          0
+        ],
+        "fishProbability": 20.1294,
+        "eggsProbability": 0,
+        "stats": {
+          "nodes": 9993464,
+          "hits": 4298396,
+          "cached": 9993464,
+          "elapsedMs": 21738
+        },
+        "verification": "Полный перебор до ограничения кеша; точность ограниченного кеша дополнительно проверена тестом без кеша"
+      },
+      {
+        "number": 4,
+        "leaves": "64733181",
+        "wins": [
+          "22378258",
+          "42354923",
+          "0"
+        ],
+        "depth": 43,
+        "probabilities": [
+          34.57,
+          65.43,
+          0
+        ],
+        "fishProbability": 15.4602,
+        "eggsProbability": 0,
+        "stats": {
+          "nodes": 11055698,
+          "hits": 4927417,
+          "cached": 11055698,
+          "elapsedMs": 26132
+        },
+        "verification": "Полный перебор до ограничения кеша; точность ограниченного кеша дополнительно проверена тестом без кеша"
+      }
+    ],
+    "valid": true
+  },
+  {
+    "name": "2026-10-01-18-00-source-009-game-001.json",
+    "sha256": "8d563f50ed1fe678d336c0b8095f2f1ade9953bae6487a279a430f310c0cde64",
+    "rounds": [
+      {
+        "number": 1,
+        "leaves": "10684565",
+        "wins": [
+          "3293436",
+          "7391072",
+          "57"
+        ],
+        "depth": 43,
+        "probabilities": [
+          30.8242,
+          69.1752,
+          0.0005
+        ],
+        "fishProbability": 16.9267,
+        "eggsProbability": 0,
+        "stats": {
+          "nodes": 3645141,
+          "hits": 1461699,
+          "cached": 3645141,
+          "elapsedMs": 6662
+        },
+        "verification": "Полный перебор до ограничения кеша; точность ограниченного кеша дополнительно проверена тестом без кеша"
+      }
+    ],
+    "valid": true
+  },
+  {
+    "name": "2026-10-01-19-44-source-010-game-001.json",
+    "sha256": "1b1a2adc3a43fd81b4087d58cd1c0825dc29ddb8d87c8a76f86859848a867c71",
+    "rounds": [
+      {
+        "number": 1,
+        "leaves": "5201554",
+        "wins": [
+          "1751966",
+          "3449555",
+          "33"
+        ],
+        "depth": 39,
+        "probabilities": [
+          33.6816,
+          66.3178,
+          0.0006
+        ],
+        "fishProbability": 16.4781,
+        "eggsProbability": 0,
+        "stats": {
+          "nodes": 2216224,
+          "hits": 844886,
+          "cached": 2216224,
+          "elapsedMs": 3505
+        },
+        "verification": "Полный перебор до ограничения кеша; точность ограниченного кеша дополнительно проверена тестом без кеша"
+      },
+      {
+        "number": 2,
+        "leaves": "115601250",
+        "wins": [
+          "51493315",
+          "63821161",
+          "286774"
+        ],
+        "depth": 48,
+        "probabilities": [
+          44.5439,
+          55.208,
+          0.2481
+        ],
+        "fishProbability": 17.1331,
+        "eggsProbability": 0,
+        "stats": {
+          "nodes": 97492531,
+          "hits": 34901551,
+          "cached": 1492531,
+          "evicted": 96000000,
+          "elapsedMs": 160563
+        },
+        "verification": "Полный перебор с ограниченным кешем после исправления памяти"
+      }
+    ],
+    "valid": true,
+    "initialError": "Worker terminated due to reaching memory limit: JS heap out of memory"
+  },
+  {
+    "name": "2026-10-01-19-49-source-012-game-001.json",
+    "sha256": "22fd5bbcab11fad29e673752c8e32b0452c345777b8634ba9e844b40eff6a0a6",
+    "rounds": [
+      {
+        "number": 1,
+        "leaves": "7328406",
+        "wins": [
+          "4255456",
+          "3072949",
+          "1"
+        ],
+        "depth": 40,
+        "probabilities": [
+          58.068,
+          41.932,
+          0
+        ],
+        "fishProbability": 18.5918,
+        "eggsProbability": 0,
+        "stats": {
+          "nodes": 2447665,
+          "hits": 932340,
+          "cached": 2447665,
+          "elapsedMs": 3785
+        },
+        "verification": "Полный перебор до ограничения кеша; точность ограниченного кеша дополнительно проверена тестом без кеша"
+      }
+    ],
+    "valid": true
+  },
+  {
+    "name": "2026-10-02-15-01-source-013-game-001.json",
+    "sha256": "f7ee0987975b7c476f703ad15c963ff1ee66bfef8981d8a0a14f7b9bc88667e8",
+    "rounds": [],
+    "error": "Кон 2, ход 1: Нарушена очередь: ожидается PLlayer.2т*T*O9859"
+  }
+]

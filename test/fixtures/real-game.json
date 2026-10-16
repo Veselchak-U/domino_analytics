@@ -1,0 +1,170 @@
+{
+  "format": "kozel-game-v1",
+  "fishVariant": "withoutEggs",
+  "scoreLimit": 50,
+  "teams": [
+    {
+      "id": "A",
+      "name": "Team A",
+      "players": [
+        {
+          "name": "esel*lchackUE*",
+          "seat": 1
+        },
+        {
+          "name": "Ramm**еп388",
+          "seat": 3
+        }
+      ]
+    },
+    {
+      "id": "B",
+      "name": "Team B",
+      "players": [
+        {
+          "name": "Zaid58",
+          "seat": 2
+        },
+        {
+          "name": "ygо58е",
+          "seat": 4
+        }
+      ]
+    }
+  ],
+  "rounds": [
+    {
+      "number": 1,
+      "deal": {
+        "esel*lchackUE*": [
+          "0-3",
+          "1-1",
+          "1-6",
+          "2-4",
+          "2-5",
+          "3-3",
+          "4-5"
+        ],
+        "Zaid58": [
+          "0-2",
+          "1-3",
+          "1-5",
+          "2-2",
+          "4-4",
+          "4-6",
+          "5-6"
+        ],
+        "Ramm**еп388": [
+          "0-0",
+          "0-4",
+          "0-6",
+          "1-2",
+          "1-4",
+          "3-4",
+          "5-5"
+        ],
+        "ygо58е": [
+          "0-1",
+          "0-5",
+          "2-3",
+          "2-6",
+          "3-5",
+          "3-6",
+          "6-6"
+        ]
+      },
+      "moves": [
+        {
+          "player": "esel*lchackUE*",
+          "action": "start",
+          "stone": "1-1"
+        },
+        {
+          "player": "Zaid58",
+          "action": "left",
+          "stone": "5-1"
+        },
+        {
+          "player": "Ramm**еп388",
+          "action": "left",
+          "stone": "5-5"
+        },
+        {
+          "player": "ygо58е",
+          "action": "left",
+          "stone": "0-5"
+        },
+        {
+          "player": "esel*lchackUE*",
+          "action": "left",
+          "stone": "3-0"
+        },
+        {
+          "player": "Zaid58",
+          "action": "right",
+          "stone": "1-3"
+        },
+        {
+          "player": "Ramm**еп388",
+          "action": "left",
+          "stone": "4-3"
+        },
+        {
+          "player": "ygо58е",
+          "action": "right",
+          "stone": "3-6"
+        },
+        {
+          "player": "esel*lchackUE*",
+          "action": "right",
+          "stone": "6-1"
+        },
+        {
+          "player": "Zaid58",
+          "action": "left",
+          "stone": "4-4"
+        },
+        {
+          "player": "Ramm**еп388",
+          "action": "left",
+          "stone": "1-4"
+        },
+        {
+          "player": "ygо58е",
+          "action": "left",
+          "stone": "0-1"
+        },
+        {
+          "player": "esel*lchackUE*",
+          "action": "pass"
+        },
+        {
+          "player": "Zaid58",
+          "action": "left",
+          "stone": "2-0"
+        },
+        {
+          "player": "Ramm**еп388",
+          "action": "left",
+          "stone": "1-2"
+        }
+      ],
+      "result": {
+        "reason": "fish",
+        "finished_player": "Ramm**еп388",
+        "winner_team": null,
+        "round_score": {
+          "Team A": 38,
+          "Team B": 58
+        },
+        "total_score": {
+          "Team A": 38,
+          "Team B": 58
+        }
+      }
+    }
+  ],
+  "result": {
+    "winner": "Team A"
+  }
+}

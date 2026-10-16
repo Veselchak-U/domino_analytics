@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Точный анализ ходов командного домино: вероятности, история и альтернативы.">
+  <title>Домино · Аналитика</title>
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="/" aria-label="Домино, главная"><span class="brand-icon">⠿</span><span>домино<span class="brand-sub">АНАЛИТИКА ИГРЫ</span></span></a>
+    <div class="side-heading">ИСТОЧНИК ДАННЫХ</div>
+    <label class="upload" for="file"><span class="upload-icon">↥</span><strong>Загрузить JSON</strong><span>Журнал kozel-game-v1 · до 5 МБ</span></label>
+    <input id="file" type="file" accept=".json,application/json" class="file-input">
+    <label for="examples" class="side-heading">ГОТОВЫЕ ЖУРНАЛЫ</label>
+    <select id="examples"><option value="">Выберите файл из out</option></select>
+    <button id="demo" class="side-button">Открыть учебный пример ↗</button>
+    <div id="game-meta" class="game-meta" hidden>
+      <div class="side-heading">ТЕКУЩАЯ ПАРТИЯ</div>
+      <p id="source-name" class="source-name"></p>
+      <p id="rules-label"></p>
+      <label for="round" class="side-heading">КОН</label>
+      <select id="round"></select>
+      <button id="analyze" class="side-button">Рассчитать выбранный кон →</button>
+      <div id="round-list" class="round-list"></div>
+    </div>
+    <div class="side-footer"><span class="local-dot"></span> Локально на вашем компьютере<br><span>Точный перебор · кеш в памяти</span></div>
+  </aside>
+  <main>
+    <header class="topbar"><span>ИГРОВАЯ ЛАБОРАТОРИЯ</span><span class="pill">КОЗЁЛ · 4 ИГРОКА</span></header>
+    <div class="page-heading"><div><p class="eyebrow">ОТ РАЗДАЧИ ДО ПОСЛЕДНЕГО ХОДА</p><h1>Каждый ход меняет игру.</h1><p class="subtitle">Все допустимые продолжения. Точные шансы. История решений.</p></div><span class="heading-mark" aria-hidden="true">▰<br>▰</span></div>
+    <div id="message" class="message" role="status" aria-live="polite" hidden></div>
+    <section id="progress" class="progress-panel" hidden>
+      <div class="progress-top"><div><strong>Строим полное дерево</strong><p id="progress-text">Подготовка расчёта…</p></div><button id="cancel" class="button secondary">Отменить</button></div>
+      <div class="progress-track"><span></span></div><p class="muted">Перебираем все продолжения. Число позиций заранее неизвестно, поэтому процент готовности не оценивается.</p>
+    </section>
+    <section id="welcome" class="welcome panel">
+      <div class="welcome-tiles" aria-hidden="true"><span>1│1</span><span>1│6</span><span>6│3</span></div>
+      <h2>Посмотрите на раздачу целиком</h2>
+      <p>Загрузите журнал партии или выберите готовый пример слева.<br>Для каждого кона рассчитаем все исходы и покажем, как реальные ходы меняли шансы команд.</p>
+      <div class="welcome-features"><span>01 &nbsp; Полное дерево</span><span>02 &nbsp; История ходов</span><span>03 &nbsp; Сравнение альтернатив</span></div>
+    </section>
+    <div id="dashboard" hidden>
+      <section class="overview">
+        <div class="panel summary-card"><span class="label">ВОЗМОЖНЫХ ИСХОДОВ КОНА</span><strong id="leaves">—</strong><span>Количество конечных ветвей дерева</span></div>
+        <div class="panel summary-card"><span class="label">МАКСИМАЛЬНАЯ ГЛУБИНА</span><strong id="depth">—</strong><span>Действий, включая заход и пропуски</span></div>
+        <div class="panel summary-card context-card"><span class="label" id="round-title">КОН 1</span><strong id="initial-score">0 : 0</strong><span id="calculation-info">Точный расчёт</span></div>
+      </section>
+      <section class="panel chart-panel">
+        <div class="section-top"><div><p class="eyebrow">ДИНАМИКА ПРЕИМУЩЕСТВА</p><h2>Вероятность победы</h2></div><div id="legend" class="legend"></div></div>
+        <div id="probabilities" class="probabilities"></div>
+        <div class="chart-wrap"><svg id="chart" viewBox="0 0 960 240" role="img" aria-label="График вероятностей победы по ходам"></svg></div>
+        <div class="chart-caption"><span>До первого хода</span><span>Ходы →</span><span>Конец кона</span></div>
+        <p class="formula">Вероятность = выигрышные конечные ветви / все конечные ветви. Все ветви равновероятны. Это модель исходов раздачи, без предположения об оптимальной игре.</p>
+      </section>
+      <section class="navigator panel" aria-label="Навигация по истории">
+        <div class="step-description"><span id="step-count" class="eyebrow">ПОЗИЦИЯ 0</span><strong id="move-title">До первого хода</strong></div>
+        <div class="nav-buttons"><button id="first" class="button secondary" aria-label="К началу">⇤</button><button id="prev" class="button secondary" aria-label="Предыдущий ход">←</button><button id="next" class="button primary">Следующий ход →</button><button id="last" class="button secondary" aria-label="К концу">⇥</button></div>
+        <input id="slider" type="range" min="0" max="1" value="0" aria-label="Шаг истории">
+      </section>
+      <section class="metrics" aria-label="Дополнительная статистика">
+        <div class="metric"><span>Изменение шансов</span><strong id="delta"></strong><small>Относительно предыдущего действия</small></div>
+        <div class="metric"><span>Камней у команд</span><strong id="counts"></strong><small>Суммарно у двух партнёров</small></div>
+        <div class="metric"><span>Стоимость рук</span><strong id="points"></strong><small>Очки остатков по правилам игры</small></div>
+        <div class="metric"><span>Допустимых действий</span><strong id="choices"></strong><small>Без одинаковых продолжений</small></div>
+        <div class="metric"><span>Вероятность рыбы</span><strong id="fish"></strong><small id="eggs"></small></div>
+      </section>
+      <div class="detail-grid">
+        <section class="panel table-panel"><div class="section-top"><h2>Позиция на столе</h2><span id="turn-label" class="muted"></span></div><div id="chain" class="chain"></div><div id="ends" class="ends"></div><div id="hands" class="hands"></div><div id="outcome" class="outcome" hidden></div></section>
+        <section class="panel alternatives-panel"><div class="section-top"><h2>Возможные ходы</h2></div><p class="muted">Шансы после каждого допустимого действия. Метка «В игре» обозначает реальный выбор.</p><div id="alternatives"></div></section>
+      </div>
+      <section class="panel history-panel"><div class="section-top"><h2>История кона</h2><span class="muted">Нажмите на строку, чтобы перейти к ходу</span></div><div class="history-scroll"><table><thead><tr><th>Шаг</th><th>Игрок / действие</th><th id="history-team-a">Команда A</th><th id="history-team-b">Команда B</th><th>Изменение A</th><th>Ничья партии</th></tr></thead><tbody id="history"></tbody></table></div></section>
+      <details class="panel explanation"><summary>Как устроен расчёт и что означает победа при рыбе</summary><p>Одинаковые дочерние позиции объединяются. Зеркальные цепочки с одинаковыми руками, открытыми концами, очередью и рыбаком эквивалентны. Разные последовательности, позднее пришедшие к одинаковой позиции, сохраняют кратность конечных ветвей.</p><p>При рыбе, завершающей партию, побеждает победитель партии; окончательная ничья считается отдельно. При продолжающейся партии побеждает команда рыбака — последнего игрока, выложившего недубль. Это относится и к рыбе с яйцами. Начисления очков и исходный результат журнала проверяются по исходной спецификации.</p><p>Шаг 0 включает все допустимые заходы назначенного игрока. При первом коне и счёте 0:0 заход обязателен с 1–1. Числа исходов точные, проценты округлены только для отображения.</p></details>
+    </div>
+    <footer class="footer">ДОМИНО / АНАЛИТИКА<span>Разобрать ход. Увидеть игру.</span></footer>
+  </main>
+</body>
+</html>

@@ -1,0 +1,24 @@
+{
+  "name": "domino-analytics",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Точный анализ дерева ходов командного домино",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "postinstall": "npm ci --prefix tools/ast-index --cache .analysis/npm-cache && node tools/ast-refresh.js rebuild",
+    "pretest": "node tools/ast-refresh.js",
+    "precheck": "node tools/ast-refresh.js",
+    "prestart": "node tools/ast-refresh.js",
+    "index": "node tools/ast-refresh.js",
+    "start": "node src/server.js",
+    "test": "node --test",
+    "check": "node tools/check.js",
+    "analyze": "node src/cli.js"
+  },
+  "dependencies": {
+    "ajv": "8.20.0"
+  }
+}

@@ -1,0 +1,15 @@
+include:
+  - src
+  - public
+  - test
+  - tools
+exclude:
+  - '**/node_modules/**'
+  - '**/.analysis/**'
+  - '**/tools/ast-index/**'
+  - tools/ast-index
+  - node_modules
+  - .analysis
+  - contracts
+  - openspec
+no_ignore: false
