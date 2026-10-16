@@ -1,5 +1,6 @@
 import { applyMove, countBits, handPoints, legalMoves, positionKey, stonesOf } from './game.js';
 import { createSolver, summarize } from './solver.js';
+import { attributeImpacts, bestOptionsAtSteps, worstOptionsAtSteps } from '../public/impact.js';
 
 export function gameSummary(game) {
   return { teams: game.teams, players: game.players, fishVariant: game.fishVariant,
@@ -13,7 +14,7 @@ export function gameSummary(game) {
 /** Analyze the whole round first, then reuse its memo for every recorded prefix. */
 export function analyzeRound(game, roundIndex, onProgress) {
   const round = game.rounds[roundIndex];
-  if (!round) throw new Error('Такого кона нет');
+  if (!round) throw new Error('Такого раунда нет');
   const solver = createSolver(round.context, onProgress);
   const base = summarize(solver.solve(round.history[0].state));
   let previous = base.probabilities;
@@ -35,7 +36,11 @@ export function analyzeRound(game, roundIndex, onProgress) {
       points: [points[0] + points[2], points[1] + points[3]],
       alternatives, terminal: alternatives.length === 0 };
   });
-  return { number: round.number, teams: game.teams, players: game.players,
+  const attributed = attributeImpacts(steps, game.players);
+  const best = bestOptionsAtSteps(steps, game.players);
+  const worst = worstOptionsAtSteps(steps, game.players);
+  steps.forEach((step, i) => { step.impact = attributed.impacts[i]; step.best = best[i]; step.worst = worst[i]; });
+  return { number: round.number, teams: game.teams, players: game.players, playerImpacts: attributed.players,
     context: round.context, outcome: round.outcome, recorded: round.recorded,
     base, steps, stats: solver.stats() };
 }

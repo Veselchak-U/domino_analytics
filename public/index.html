@@ -21,16 +21,15 @@
       <div class="side-heading">ТЕКУЩАЯ ПАРТИЯ</div>
       <p id="source-name" class="source-name"></p>
       <p id="rules-label"></p>
-      <label for="round" class="side-heading">КОН</label>
+      <label for="round" class="side-heading">РАУНД</label>
       <select id="round"></select>
-      <button id="analyze" class="side-button">Рассчитать выбранный кон →</button>
+      <button id="analyze" class="side-button">Рассчитать выбранный раунд →</button>
       <div id="round-list" class="round-list"></div>
     </div>
     <div class="side-footer"><span class="local-dot"></span> Локально на вашем компьютере<br><span>Точный перебор · кеш в памяти</span></div>
   </aside>
   <main>
     <header class="topbar"><span>ИГРОВАЯ ЛАБОРАТОРИЯ</span><span class="pill">КОЗЁЛ · 4 ИГРОКА</span></header>
-    <div class="page-heading"><div><p class="eyebrow">ОТ РАЗДАЧИ ДО ПОСЛЕДНЕГО ХОДА</p><h1>Каждый ход меняет игру.</h1><p class="subtitle">Все допустимые продолжения. Точные шансы. История решений.</p></div><span class="heading-mark" aria-hidden="true">▰<br>▰</span></div>
     <div id="message" class="message" role="status" aria-live="polite" hidden></div>
     <section id="progress" class="progress-panel" hidden>
       <div class="progress-top"><div><strong>Строим полное дерево</strong><p id="progress-text">Подготовка расчёта…</p></div><button id="cancel" class="button secondary">Отменить</button></div>
@@ -39,26 +38,44 @@
     <section id="welcome" class="welcome panel">
       <div class="welcome-tiles" aria-hidden="true"><span>1│1</span><span>1│6</span><span>6│3</span></div>
       <h2>Посмотрите на раздачу целиком</h2>
-      <p>Загрузите журнал партии или выберите готовый пример слева.<br>Для каждого кона рассчитаем все исходы и покажем, как реальные ходы меняли шансы команд.</p>
+      <p>Загрузите журнал партии или выберите готовый пример слева.<br>Для каждого раунда рассчитаем все исходы и покажем, как реальные ходы меняли шансы команд.</p>
       <div class="welcome-features"><span>01 &nbsp; Полное дерево</span><span>02 &nbsp; История ходов</span><span>03 &nbsp; Сравнение альтернатив</span></div>
     </section>
     <div id="dashboard" hidden>
       <section class="overview">
-        <div class="panel summary-card"><span class="label">ВОЗМОЖНЫХ ИСХОДОВ КОНА</span><strong id="leaves">—</strong><span>Количество конечных ветвей дерева</span></div>
-        <div class="panel summary-card"><span class="label">МАКСИМАЛЬНАЯ ГЛУБИНА</span><strong id="depth">—</strong><span>Действий, включая заход и пропуски</span></div>
-        <div class="panel summary-card context-card"><span class="label" id="round-title">КОН 1</span><strong id="initial-score">0 : 0</strong><span id="calculation-info">Точный расчёт</span></div>
+        <div class="panel summary-card"><span class="label">ИСХОДОВ ИЗ НАЧАЛЬНОЙ РАЗДАЧИ</span><strong id="leaves">—</strong><span>Все конечные ветви раунда до первого хода</span></div>
+        <div class="panel summary-card move-range-card"><span class="label">КОЛИЧЕСТВО ХОДОВ</span><div class="move-range"><span>Минимальное кол-во ходов:</span><strong id="min-depth">—</strong></div><div class="move-range"><span>Максимальное кол-во ходов:</span><strong id="depth">—</strong></div><span>Из начальной раздачи, включая заход и пропуски</span></div>
+        <div class="panel summary-card context-card"><span class="label" id="round-title">РАУНД 1</span><strong id="initial-score">0 : 0</strong><span id="calculation-info">Точный расчёт</span></div>
       </section>
       <section class="panel chart-panel">
         <div class="section-top"><div><p class="eyebrow">ДИНАМИКА ПРЕИМУЩЕСТВА</p><h2>Вероятность победы</h2></div><div id="legend" class="legend"></div></div>
         <div id="probabilities" class="probabilities"></div>
-        <div class="chart-wrap"><svg id="chart" viewBox="0 0 960 240" role="img" aria-label="График вероятностей победы по ходам"></svg></div>
-        <div class="chart-caption"><span>До первого хода</span><span>Ходы →</span><span>Конец кона</span></div>
+        <div class="charts-scroll"><div id="charts-canvas">
+          <div class="chart-wrap"><svg id="chart" viewBox="0 0 960 240" role="img" aria-label="График вероятностей победы по ходам"></svg></div>
+          <p id="best-chances" class="muted" aria-live="polite"></p>
+          <p id="worst-chances" class="muted" aria-live="polite"></p>
+          <h3 class="impact-heading">Влияние хода</h3>
+          <div id="player-legend" class="legend"></div>
+          <div class="legend move-comparison-legend"><span class="legend-item"><i class="move-swatch best-swatch"></i>Лучший допустимый ход</span><span class="legend-item"><i class="move-swatch actual-swatch"></i>Сделанный ход</span><span class="legend-item"><i class="move-swatch worst-swatch"></i>Худший вероятный ход</span></div>
+          <p id="impact-selection" class="muted" aria-live="polite">До первого хода · импакт 0,00 %</p>
+          <div class="chart-wrap"><svg id="impact-chart" viewBox="0 0 960 365" role="img" aria-label="Влияние хода: лучший, сделанный и худший вероятный"></svg></div>
+          <div class="chart-caption"><span>До первого хода</span><span>Ходы →</span><span>Конец раунда</span></div>
+        </div></div>
         <p class="formula">Вероятность = выигрышные конечные ветви / все конечные ветви. Все ветви равновероятны. Это модель исходов раздачи, без предположения об оптимальной игре.</p>
+        <p class="formula">Пунктир — лучший шанс каждой команды из позиции перед соответствующим реальным ходом. Максимумы A и B независимы: они могут достигаться разными ходами, поэтому их сумма может превышать 100%. Это не отдельный идеальный розыгрыш.</p>
+        <p class="formula">Линии из точек — худший шанс каждой команды среди допустимых ходов из той же реальной позиции. Минимумы A и B независимы и могут достигаться разными ходами. Это не отдельный розыгрыш самых плохих ходов.</p>
+        <p class="formula">Импакт = шанс своей команды после хода − до хода. Плюс — улучшение, минус — ухудшение. Разница 50% → 60% обозначается +10%; это не относительный прирост.</p>
       </section>
       <section class="navigator panel" aria-label="Навигация по истории">
         <div class="step-description"><span id="step-count" class="eyebrow">ПОЗИЦИЯ 0</span><strong id="move-title">До первого хода</strong></div>
         <div class="nav-buttons"><button id="first" class="button secondary" aria-label="К началу">⇤</button><button id="prev" class="button secondary" aria-label="Предыдущий ход">←</button><button id="next" class="button primary">Следующий ход →</button><button id="last" class="button secondary" aria-label="К концу">⇥</button></div>
         <input id="slider" type="range" min="0" max="1" value="0" aria-label="Шаг истории">
+      </section>
+      <section class="panel player-impact-panel" aria-label="Итоговый импакт игроков">
+        <div class="section-top"><div><p class="eyebrow">ВКЛАД В ШАНСЫ СВОЕЙ КОМАНДЫ</p><h2>Импакт игроков по раундам и партии</h2></div><button id="analyze-game" class="button secondary">Досчитать всю партию</button></div>
+        <p id="impact-status" class="muted" aria-live="polite"></p>
+        <div class="history-scroll"><table id="player-impact-table"><thead id="player-impact-head"></thead><tbody id="player-impact-body"></tbody></table></div>
+        <p class="formula">Сумма изменений после собственных ходов игрока за весь раунд, независимо от выбранного шага. Итог партии — сумма всех раундов; пока не все раунды рассчитаны, итог обозначен прочерком.</p>
       </section>
       <section class="metrics" aria-label="Дополнительная статистика">
         <div class="metric"><span>Изменение шансов</span><strong id="delta"></strong><small>Относительно предыдущего действия</small></div>
@@ -71,8 +88,8 @@
         <section class="panel table-panel"><div class="section-top"><h2>Позиция на столе</h2><span id="turn-label" class="muted"></span></div><div id="chain" class="chain"></div><div id="ends" class="ends"></div><div id="hands" class="hands"></div><div id="outcome" class="outcome" hidden></div></section>
         <section class="panel alternatives-panel"><div class="section-top"><h2>Возможные ходы</h2></div><p class="muted">Шансы после каждого допустимого действия. Метка «В игре» обозначает реальный выбор.</p><div id="alternatives"></div></section>
       </div>
-      <section class="panel history-panel"><div class="section-top"><h2>История кона</h2><span class="muted">Нажмите на строку, чтобы перейти к ходу</span></div><div class="history-scroll"><table><thead><tr><th>Шаг</th><th>Игрок / действие</th><th id="history-team-a">Команда A</th><th id="history-team-b">Команда B</th><th>Изменение A</th><th>Ничья партии</th></tr></thead><tbody id="history"></tbody></table></div></section>
-      <details class="panel explanation"><summary>Как устроен расчёт и что означает победа при рыбе</summary><p>Одинаковые дочерние позиции объединяются. Зеркальные цепочки с одинаковыми руками, открытыми концами, очередью и рыбаком эквивалентны. Разные последовательности, позднее пришедшие к одинаковой позиции, сохраняют кратность конечных ветвей.</p><p>При рыбе, завершающей партию, побеждает победитель партии; окончательная ничья считается отдельно. При продолжающейся партии побеждает команда рыбака — последнего игрока, выложившего недубль. Это относится и к рыбе с яйцами. Начисления очков и исходный результат журнала проверяются по исходной спецификации.</p><p>Шаг 0 включает все допустимые заходы назначенного игрока. При первом коне и счёте 0:0 заход обязателен с 1–1. Числа исходов точные, проценты округлены только для отображения.</p></details>
+      <section class="panel history-panel"><div class="section-top"><h2>История раунда</h2><span class="muted">Нажмите на строку, чтобы перейти к ходу</span></div><div class="history-scroll"><table><thead><tr><th>Шаг</th><th>Игрок / действие</th><th id="history-team-a">Команда A</th><th id="history-team-b">Команда B</th><th>Изменение A</th><th>Ничья партии</th></tr></thead><tbody id="history"></tbody></table></div></section>
+      <details class="panel explanation"><summary>Как устроен расчёт и что означает победа при рыбе</summary><p>Одинаковые дочерние позиции объединяются. Зеркальные цепочки с одинаковыми руками, открытыми концами, очередью и рыбаком эквивалентны. Разные последовательности, позднее пришедшие к одинаковой позиции, сохраняют кратность конечных ветвей.</p><p>При рыбе, завершающей партию, побеждает победитель партии; окончательная ничья считается отдельно. При продолжающейся партии побеждает команда рыбака — последнего игрока, выложившего недубль. Это относится и к рыбе с яйцами. Начисления очков и исходный результат журнала проверяются по исходной спецификации.</p><p>Шаг 0 включает все допустимые заходы назначенного игрока. При первом раунде и счёте 0:0 заход обязателен с 1–1. Числа исходов точные, проценты округлены только для отображения.</p></details>
     </div>
     <footer class="footer">ДОМИНО / АНАЛИТИКА<span>Разобрать ход. Увидеть игру.</span></footer>
   </main>

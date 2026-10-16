@@ -79,7 +79,7 @@ export function legalMoves(s) {
 }
 /** Strict replay never silently flips a recorded tile. */
 export function applyMove(s, move) {
-  if (isTerminal(s)) throw new Error('Ход после завершения кона');
+  if (isTerminal(s)) throw new Error('Ход после завершения раунда');
   const next = { ...s, hands: [...s.hands], turn: (s.turn + 1) % 4, forcedStart: null };
   if (move.action === 'pass') {
     if (s.left === null || (s.hands[s.turn] & (SUITS[s.left] | SUITS[s.right]))) throw new Error('Пропуск запрещён: есть допустимый камень');

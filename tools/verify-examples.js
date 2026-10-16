@@ -5,7 +5,7 @@ import { Worker } from 'node:worker_threads';
 import { parseGame } from '../src/input.js';
 
 const directory = process.argv[2];
-if (!directory) throw new Error('Укажите каталог out; необязательно добавьте --full для перебора каждого кона');
+if (!directory) throw new Error('Укажите каталог out; необязательно добавьте --full для перебора каждого раунда');
 const full = process.argv.includes('--full');
 const report = [];
 function analyze(text, round) {
@@ -23,11 +23,11 @@ for (const name of (await readdir(directory)).filter(n => n.endsWith('.json') &&
   try {
     const game = parseGame(text);
     entry.valid = true;
-    console.log(`${name}: проверка ${game.rounds.length} конов OK`);
+    console.log(`${name}: проверка ${game.rounds.length} раундов OK`);
     if (full) for (const round of game.rounds) {
       const result = await analyze(text, round.number);
       entry.rounds.push({ number: round.number, ...result.base, stats: result.stats });
-      console.log(`  кон ${round.number}: ${result.base.leaves} листьев, глубина ${result.base.depth}, ${result.stats.elapsedMs} мс`);
+      console.log(`  раунд ${round.number}: ${result.base.leaves} листьев, глубина ${result.base.depth}, ${result.stats.elapsedMs} мс`);
     }
   } catch (e) { entry.error = e.message; console.log(`  ОШИБКА: ${e.message}`); }
   report.push(entry);

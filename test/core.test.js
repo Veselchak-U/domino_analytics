@@ -22,9 +22,23 @@ test('зеркальные продолжения одного узла объе
   assert.deepEqual(result.wins, [1n, 1n, 0n]);
   assert.equal(result.leaves, 2n);
   assert.equal(result.depth, 3);
+  assert.equal(result.minDepth, 2);
   const hits = solver.stats().hits;
   assert.strictEqual(solver.solve(s), result);
+  assert.equal(summarize(solver.solve(s)).minDepth, 2);
   assert.ok(solver.stats().hits > hits);
+});
+
+test('границы ходов учитывают обязательный пас, завершённая позиция имеет 0/0', () => {
+  const s = state([['0-0'], ['6-6'], ['2-2'], ['3-3']]);
+  const solver = createSolver(context());
+  const result = solver.solve(s);
+  assert.deepEqual([result.minDepth, result.depth], [2, 2]);
+  const end = applyMove(applyMove(s, { action: 'pass' }), { action: 'left', stone: '6-6' });
+  const terminal = solver.solve(end);
+  assert.deepEqual([terminal.minDepth, terminal.depth], [0, 0]);
+  const fish = solver.solve(state([['0-0'], ['0-2'], ['1-1'], ['2-2']]));
+  assert.deepEqual([fish.minDepth, fish.depth], [0, 0]);
 });
 
 test('рыба без завершения партии принадлежит рыбаку; счёт остаётся по исходным правилам', () => {
@@ -64,7 +78,8 @@ test('дубль не меняет рыбака, неверная ориента
 
 test('точность целых сохраняется за пределами Number.MAX_SAFE_INTEGER', () => {
   const n = 9007199254740993n;
-  const result = summarize({ leaves: n, wins: [n - 1n, 1n, 0n], fish: 1n, eggs: 0n, depth: 40 });
+  const result = summarize({ leaves: n, wins: [n - 1n, 1n, 0n], fish: 1n, eggs: 0n, minDepth: 7, depth: 40 });
+  assert.equal(result.minDepth, 7);
   assert.equal(result.leaves, '9007199254740993');
   assert.deepEqual(result.wins, ['9007199254740992', '1', '0']);
 });
@@ -107,6 +122,11 @@ test('мемоизация совпадает с развёрнутым пере
   const { readFileSync } = await import('node:fs');
   const game = parseGame(readFileSync(new URL('./fixtures/real-game.json', import.meta.url), 'utf8'));
   const round = game.rounds[0], solver = createSolver(round.context);
+  function terminalLengths(s, distance = 0, lengths = []) {
+    if (isTerminal(s)) lengths.push(distance);
+    else for (const move of legalMoves(s)) terminalLengths(applyMove(s, move), distance + 1, lengths);
+    return lengths;
+  }
   // Independent aggregation without a memo checks that shared subtrees keep path multiplicity.
   function unrolled(s) {
     const outcome = settle(s, round.context);
@@ -124,6 +144,7 @@ test('мемоизация совпадает с развёрнутым пере
     const expected = unrolled(s), actual = solver.solve(s);
     assert.equal(actual.leaves, expected.leaves);
     assert.equal(actual.depth, expected.depth);
+    assert.equal(actual.minDepth, Math.min(...terminalLengths(s)));
     assert.deepEqual(actual.wins, expected.wins);
   }
   assert.ok(solver.stats().hits > 0);
@@ -133,6 +154,7 @@ test('мемоизация совпадает с развёрнутым пере
   assert.equal(actual.leaves, expected.leaves);
   assert.deepEqual(actual.wins, expected.wins);
   assert.equal(actual.depth, expected.depth);
+  assert.equal(actual.minDepth, Math.min(...terminalLengths(s)));
   assert.ok(bounded.stats().cached <= 16);
   assert.ok(bounded.stats().evicted > 0);
 });

@@ -1,0 +1,18 @@
+{
+  "description": "Refresh the local AST index when an agent session starts or resumes.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "^(startup|resume|clear)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const fs=require('node:fs'),p=require('node:path');let root=process.cwd();while(!fs.existsSync(p.join(root,'tools/ast-refresh.js'))){const parent=p.dirname(root);if(parent===root)throw Error('Project root not found');root=parent;}require('node:child_process').execFileSync(process.execPath,[p.join(root,'tools/ast-refresh.js')],{stdio:['ignore','ignore','inherit']});\"",
+            "timeout": 60,
+            "statusMessage": "Refreshing project AST index"
+          }
+        ]
+      }
+    ]
+  }
+}

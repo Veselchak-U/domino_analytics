@@ -83,7 +83,7 @@ export function createApp({ examplesDir = process.env.DOMINO_EXAMPLES_DIR ?? 'C:
       if (req.method === 'POST' && route === '/api/analyze') {
         const { gameId, round } = await body(req), game = games.get(gameId);
         if (!game) throw new Error('Загрузите журнал заново: его нет в памяти');
-        if (!Number.isInteger(round) || round < 1 || round > game.summary.rounds.length) throw new Error('Неверный номер кона');
+        if (!Number.isInteger(round) || round < 1 || round > game.summary.rounds.length) throw new Error('Неверный номер раунда');
         const key = `${gameId}:${round}`, cached = completed.get(key);
         if (cached) {
           remember(completed, key, cached);
@@ -132,7 +132,7 @@ export function createApp({ examplesDir = process.env.DOMINO_EXAMPLES_DIR ?? 'C:
           return json(res, 200, view(job));
         }
       }
-      const assets = { '/': ['index.html', 'text/html'], '/app.js': ['app.js', 'text/javascript'], '/style.css': ['style.css', 'text/css'] };
+      const assets = { '/': ['index.html', 'text/html'], '/app.js': ['app.js', 'text/javascript'], '/impact.js': ['impact.js', 'text/javascript'], '/style.css': ['style.css', 'text/css'] };
       if (req.method === 'GET' && assets[route]) {
         const [file, type] = assets[route];
         const content = await readFile(path.join(PUBLIC, file));
@@ -152,7 +152,7 @@ export function createApp({ examplesDir = process.env.DOMINO_EXAMPLES_DIR ?? 'C:
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   const port = Number(process.env.PORT ?? 3210);
   const app = createApp();
-  app.server.on('error', e => { console.error(`Не удалось запустить сервер: ${e.message}`); process.exitCode = 1; });
-  app.server.listen(port, '127.0.0.1', () => console.log(`Домино · аналитика: http://127.0.0.1:${app.server.address().port}`));
+  app.server.on('error', e => { console.error(`Failed to start server: ${e.message}`); process.exitCode = 1; });
+  app.server.listen(port, '127.0.0.1', () => console.log(`Page available at: http://127.0.0.1:${app.server.address().port}`));
   for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => app.close().then(() => process.exit(0)));
 }

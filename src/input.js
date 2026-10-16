@@ -87,10 +87,10 @@ export function parseGame(text) {
   let context = { fishVariant: data.fishVariant, scoreLimit: data.scoreLimit, score: [0, 0], fence: [0, 0], eggs: 0 };
   let previous = null;
   for (const [index, round] of data.rounds.entries()) {
-    const prefix = `Кон ${index + 1}`;
+    const prefix = `Раунд ${index + 1}`;
     try {
-      if (previous && previous.gameWinner !== null) throw new Error('Партия уже завершена предыдущим коном');
-      if (round.number !== index + 1) throw new Error('Нарушена последовательность номеров конов');
+      if (previous && previous.gameWinner !== null) throw new Error('Партия уже завершена предыдущим раундом');
+      if (round.number !== index + 1) throw new Error('Нарушена последовательность номеров раундов');
       if (!keysMatch(round.deal, names)) throw new Error('Имена раздачи не совпадают с игроками');
       const hands = names.map(n => maskOf(round.deal[n]));
       if (hands.reduce((m, h) => m | h, 0) !== 2 ** 28 - 1) throw new Error('Раздача должна содержать все 28 разных камней');
@@ -115,7 +115,7 @@ export function parseGame(text) {
         } catch (e) { throw new Error(`ход ${m + 1}: ${e.message}`); }
       }
       const outcome = settle(state, context);
-      if (!outcome) throw new Error('Журнал кона закончился до выхода или полной блокировки');
+      if (!outcome) throw new Error('Журнал раунда закончился до выхода или полной блокировки');
       const expected = recordedResult(outcome, players, teams);
       if (!isDeepStrictEqual(expected, round.result)) throw new Error(`Результат не совпадает с воспроизведением. Ожидается ${JSON.stringify(expected)}`);
       rounds.push({ number: round.number, context, history, outcome, recorded: round.result });
@@ -123,7 +123,7 @@ export function parseGame(text) {
       context = { ...context, score: outcome.totalScore, fence: outcome.fence, eggs: outcome.eggs };
     } catch (e) { throw new Error(`${prefix}, ${e.message}`); }
   }
-  if (previous.gameWinner === null) throw new Error('Партия не завершена последним коном');
+  if (previous.gameWinner === null) throw new Error('Партия не завершена последним раундом');
   const expected = previous.gameWinner === 2 ? { draw: true } : { winner: teams[previous.gameWinner] };
   if (!isDeepStrictEqual(expected, data.result)) throw new Error(`Итог партии не совпадает: ожидается ${JSON.stringify(expected)}`);
   return { teams, players, rounds, result: data.result, fishVariant: data.fishVariant, scoreLimit: data.scoreLimit };

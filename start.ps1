@@ -14,8 +14,7 @@ try {
         throw 'Для запуска нужен Node.js 22 или новее.'
     }
 
-    if (-not (Test-Path -LiteralPath 'node_modules/ajv/package.json') -or
-        -not (Test-Path -LiteralPath 'tools/ast-index/node_modules/.bin/ast-index.cmd')) {
+    if (-not (Test-Path -LiteralPath 'node_modules/ajv/package.json')) {
         Write-Host 'Устанавливаем зависимости проекта...'
         & npm.cmd ci --cache .analysis/npm-cache
         if ($LASTEXITCODE -ne 0) { throw 'Не удалось установить зависимости.' }

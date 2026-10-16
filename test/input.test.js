@@ -15,12 +15,12 @@ test('повторные ключи и неверные итоги отклон�
   assert.throws(() => parseGame(text.replace('"format":', '"format":"kozel-game-v1","format":')), /повтор/i);
   const data = JSON.parse(text);
   data.rounds[0].result.finished_player = 'Неизвестный';
-  assert.throws(() => parseGame(JSON.stringify(data)), /кон 1.*результат/i);
+  assert.throws(() => parseGame(JSON.stringify(data)), /раунд 1.*результат/i);
 });
 test('некорректная очередь, ориентация и дублирование камней обнаруживаются', () => {
   const data = JSON.parse(text);
   data.rounds[0].moves[0].player = data.rounds[0].moves[1].player;
-  assert.throws(() => parseGame(JSON.stringify(data)), /кон 1, ход 1.*очеред/i);
+  assert.throws(() => parseGame(JSON.stringify(data)), /раунд 1, ход 1.*очеред/i);
 });
 
 for (const [name, mutate, pattern] of [
@@ -31,7 +31,7 @@ for (const [name, mutate, pattern] of [
   ['повтор места', d => { d.teams[1].players[0].seat = d.teams[0].players[0].seat; }, /места/],
   ['неизвестное имя раздачи', d => { const deal = d.rounds[0].deal; deal.Unknown = deal[Object.keys(deal)[0]]; delete deal[Object.keys(deal)[0]]; }, /Имена раздачи/],
   ['несовпадение начислений', d => { const r = d.rounds[1].result; r.round_score[Object.keys(r.round_score)[0]]++; }, /Результат/],
-  ['обрыв журнала кона', d => { d.rounds[0].moves.pop(); }, /закончился до/],
+  ['обрыв журнала раунда', d => { d.rounds[0].moves.pop(); }, /закончился до/],
   ['непоследовательный номер', d => { d.rounds[1].number = 3; }, /номеров/],
   ['незавершённая партия', d => { d.rounds.pop(); }, /Партия не завершена/],
 ]) {

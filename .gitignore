@@ -2,3 +2,4 @@ node_modules/
 .analysis/
 coverage/
 *.log
+openspec/changes/archive/.openspec-archive.lock

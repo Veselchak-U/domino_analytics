@@ -24,17 +24,18 @@ export function createSolver(context, onProgress = () => {}, { cacheEntries = 20
       if (!result) {
         const wins = [0n, 0n, 0n]; wins[outcome.analyticsWinner] = 1n;
         result = { leaves: 1n, wins, fish: outcome.reason === 'emptyHand' ? 0n : 1n,
-          eggs: outcome.reason === 'eggs' ? 1n : 0n, depth: 0 };
+          eggs: outcome.reason === 'eggs' ? 1n : 0n, minDepth: 0, depth: 0 };
         terminals.set(terminalKey, result);
       }
     } else {
-      result = { leaves: 0n, wins: [0n, 0n, 0n], fish: 0n, eggs: 0n, depth: 0 };
+      result = { leaves: 0n, wins: [0n, 0n, 0n], fish: 0n, eggs: 0n, minDepth: Infinity, depth: 0 };
       for (const move of legalMoves(s)) {
         const child = solve(applyMove(s, move));
         result.leaves += child.leaves;
         for (let t = 0; t < 3; t++) result.wins[t] += child.wins[t];
         result.fish += child.fish; result.eggs += child.eggs;
         result.depth = Math.max(result.depth, child.depth + 1);
+        result.minDepth = Math.min(result.minDepth, child.minDepth + 1);
       }
     }
     if (recent.size >= generationSize) {
@@ -51,7 +52,7 @@ export function percentage(numerator, denominator) {
   return Number((numerator * 1000000n + denominator / 2n) / denominator) / 10000;
 }
 export function summarize(result) {
-  return { leaves: String(result.leaves), wins: result.wins.map(String), depth: result.depth,
+  return { leaves: String(result.leaves), wins: result.wins.map(String), minDepth: result.minDepth, depth: result.depth,
     probabilities: result.wins.map(w => percentage(w, result.leaves)),
     fishProbability: percentage(result.fish, result.leaves), eggsProbability: percentage(result.eggs, result.leaves) };
 }
