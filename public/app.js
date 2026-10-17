@@ -1,3 +1,4 @@
+import { summarizePlayerQuality } from './quality.js';
 import { aggregateImpacts, alternativeImpact, comparisonChance, decisionQuality, decisionSpread } from './impact.js';
 import { formatCacheSize, formatPointDifference } from './format.js';
 import { revealChartStep } from './navigation.js';
@@ -211,7 +212,24 @@ function renderPlayerImpacts() {
     row.append(element('td', total < 0 ? 'negative' : 'positive', total === null ? '—' : `${signed(total)} %`));
     $('player-impact-body').append(row);
   });
-  updateRoundButtons();
+  updateRoundButtons(); renderQualitySummary();
+}
+
+function renderQualitySummary() {
+  const summary = summarizePlayerQuality([...roundAnalyses.values()], game.players, game.rounds.length);
+  const current = summary.byRound.find(r => r.number === analysis.number);
+  $('quality-status').textContent = `Раунд ${analysis.number} · Рассчитано ${summary.completedRounds} из ${game.rounds.length} раундов · ${summary.complete ? 'итог партии готов' : 'итог партии ещё не готов'}`;
+  $('quality-body').replaceChildren();
+  for (const [label, values] of [[`Раунд ${analysis.number}${current?.complete ? '' : ' (неполно)'}`, current?.players], ['Вся партия', summary.players]]) {
+    game.players.forEach((player, i) => {
+      const row = element('tr'), p = values?.[i];
+      row.append(element('td', '', player.name), element('td', '', label));
+      row.append(element('td', '', p ? `${p.best} из ${p.decisions}` : '—'));
+      for (const key of ['bestShare', 'averageLoss', 'maxLoss']) row.append(element('td', '', p?.[key] ? formatPointDifference(p[key]) : '—'));
+      for (const key of ['forced', 'equivalent', 'unavailable']) row.append(element('td', '', p ? p[key] : '—'));
+      $('quality-body').append(row);
+    });
+  }
 }
 
 function renderAnalysis() {
@@ -303,10 +321,10 @@ function renderStep() {
   const quality = decisionQuality(step);
   const choiceLabels = { forced: 'Вынужденный ход', equivalent: 'Равноценный выбор', choice: 'Разные оценки' };
   $('choice-status').textContent = quality.kind === 'terminal' ? 'Раунд завершён'
-    : `${choiceLabels[quality.kind]} · Лучших вариантов: ${quality.bestCount} из ${quality.entries.length}`;
+    : quality.kind === 'forced' ? choiceLabels.forced : `${choiceLabels[quality.kind]} · Лучших вариантов: ${quality.bestCount} из ${quality.entries.length}`;
   const spread = decisionSpread(step);
   $('choice-spread').textContent = `Разброс: ${spread.range ? formatPointDifference(spread.range) : '—'} · Отрыв лидера: ${spread.gap ? formatPointDifference(spread.gap) : quality.kind === 'forced' ? '— (нет второго варианта)' : '—'}`;
-  $('recorded-choice').hidden = !quality.actual;
+  $('recorded-choice').hidden = !quality.actual || quality.kind === 'forced';
   if (quality.actual) {
     const { alternative, loss } = quality.actual;
     $('recorded-choice').textContent = `В игре: ${actionText(alternative)} · Влияние ${signed(alternativeImpact(step, alternative))} % · Упущенная возможность по анализатору: ${formatPointDifference(loss)}`;
@@ -317,15 +335,16 @@ function renderStep() {
     if (alternative.stone) head.append(domino(alternative.stone));
     head.append(element('span', '', actionText(alternative)));
     const impact = alternativeImpact(step, alternative);
-    head.append(element('span', `alternative-impact ${impact > 0 ? 'positive' : impact < 0 ? 'negative' : ''}`, `Влияние ${signed(impact)} %`));
-    if (best) head.append(element('span', 'best-marker', quality.bestCount > 1 ? 'Один из лучших' : 'Лучший'));
+    if (quality.kind !== 'forced') head.append(element('span', `alternative-impact ${impact > 0 ? 'positive' : impact < 0 ? 'negative' : ''}`, `Влияние ${signed(impact)} %`));
+    if (best && quality.kind !== 'forced') head.append(element('span', 'best-marker', quality.bestCount > 1 ? 'Один из лучших' : 'Лучший'));
     if (alternative.actual) head.append(element('span', 'actual', 'В игре'));
     const chances = element('div', 'alt-chances');
     for (let t = 0; t < 2; t++) chances.append(element('span', classes[t], percent(alternative.probabilities[t], alternative.wins[t], alternative.leaves)));
     const bar = element('div', 'chance-bar');
     for (let t = 0; t < 3; t++) { const segment = element('span', `bg-${classes[t]}`); segment.style.width = `${alternative.probabilities[t]}%`; bar.append(segment); }
-    card.append(head, element('div', `opportunity-loss ${loss.numerator > 0n ? 'negative' : ''}`, `Потеря к лучшему: ${formatPointDifference(loss)}`),
-      chances, bar, element('div', 'alt-leaves', `${nf.format(BigInt(alternative.leaves))} исходов · ничья ${percent(alternative.probabilities[2], alternative.wins[2], alternative.leaves)}`));
+    card.append(head);
+    if (quality.kind !== 'forced') card.append(element('div', `opportunity-loss ${loss.numerator > 0n ? 'negative' : ''}`, `Потеря к лучшему: ${formatPointDifference(loss)}`));
+    card.append(chances, bar, element('div', 'alt-leaves', `${nf.format(BigInt(alternative.leaves))} исходов · ничья ${percent(alternative.probabilities[2], alternative.wins[2], alternative.leaves)}`));
     $('alternatives').append(card);
   }
   if (!step.alternatives.length) $('alternatives').append(element('p', 'muted', 'Дальнейших ходов нет. Раунд завершён.'));

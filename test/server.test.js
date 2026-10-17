@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createApp } from '../src/server.js';
 import { decisionQuality } from '../public/impact.js';
+import { summarizePlayerQuality } from '../public/quality.js';
 
 test('локальный HTTP: проверка, worker, отмена, повтор, кеш и восстановление после ошибки', { timeout: 120000 }, async () => {
   const app = createApp({ examplesDir: new URL('./fixtures', import.meta.url).pathname });
@@ -21,6 +22,7 @@ test('локальный HTTP: проверка, worker, отмена, повт�
     assert.equal(theme.status, 200);
     assert.match(theme.headers.get('content-type'), /text\/javascript/);
     assert.equal((await fetch(base + '/impact.js')).status, 200);
+    assert.equal((await fetch(base + '/quality.js')).status, 200);
     assert.equal((await fetch(base + '/format.js')).status, 200);
     const navigation = await fetch(base + '/navigation.js');
     assert.equal(navigation.status, 200);
@@ -57,6 +59,14 @@ test('локальный HTTP: проверка, worker, отмена, повт�
     assert.equal(result.steps[11].impact.value, 8.9445);
     assert.equal(result.playerImpacts.length, 4);
     assert.equal(result.steps.at(-1).leaves, '1');
+    const qualitySummary = summarizePlayerQuality([result], result.players, 1);
+    assert.equal(qualitySummary.complete, true);
+    qualitySummary.players.forEach((p, index) => {
+      const actions = result.steps.filter(s => s.move?.player === result.players[index].name).length;
+      assert.equal(p.decisions + p.forced + p.equivalent + p.unavailable, actions);
+      assert.ok(p.best <= p.decisions);
+      if (p.averageLoss) assert.ok(p.averageLoss.numerator >= 0n);
+    });
     for (const step of result.steps) {
       assert.equal(step.hands.flat().length + step.chain.length, 28);
       assert.equal(step.wins.reduce((n, s) => n + BigInt(s), 0n), BigInt(step.leaves));
