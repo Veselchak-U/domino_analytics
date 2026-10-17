@@ -151,6 +151,18 @@ function domino(stone, layout) {
   return node;
 }
 
+
+function chainTiles(stones) {
+  const teams = chainTeams(stones, analysis.steps[0].hands);
+  return stones.map((stone, i) => {
+    const tile = domino(stone, 'chain'), team = teams[i];
+    tile.classList.add(`tile-team-${team}`);
+    tile.title = `${stone} · ${analysis.teams[team]}`;
+    tile.setAttribute('aria-label', `${stone.replace('-', '–')} · ${analysis.teams[team]}`);
+    return tile;
+  });
+}
+
 async function importSource(request, name) {
   if (busy) return;
   setBusy(true); showMessage('Проверяем журнал и воспроизводим ходы…');
@@ -331,7 +343,7 @@ function renderTraining() {
   if (valid) {
     const step = analysis.steps[training.position], question = trainingQuestion(step);
     const chain = element('div', 'chain');
-    chain.append(...(question.chain.length ? question.chain.map(stone => domino(stone, 'chain')) : [element('span', 'chain-empty', 'Цепочка ещё не начата')]));
+    chain.append(...(question.chain.length ? chainTiles(question.chain) : [element('span', 'chain-empty', 'Цепочка ещё не начата')]));
     $('training-board').append(chain, element('p', 'muted', `Открытые концы: ${question.ends.join(' и ') || 'заход'}`));
     const hands = element('div', 'hands');
     question.hands.forEach((stones, i) => {
@@ -417,8 +429,8 @@ function renderBranch() {
     : result.branch.example === 'loss' ? `Пример проигрышного продолжения команды ${analysis.teams[team]}`
     : result.branch.example === 'draw' ? 'Пример продолжения с ничьей партии' : 'Исследование выбранной ветки';
   $('branch-context').textContent += ` Шаг ветки ${branch.position} / ${result.steps.length - 1}. ${label}.`;
-  const chain = element('div', 'chain'), owners = chainTeams(step.chain, analysis.steps[0].hands);
-  step.chain.forEach((stone, i) => { const tile = domino(stone, 'chain'); tile.classList.add(`tile-team-${owners[i]}`); chain.append(tile); });
+  const chain = element('div', 'chain');
+  chain.append(...chainTiles(step.chain));
   if (!step.chain.length) chain.append(element('span', 'chain-empty', 'Цепочка ещё не начата'));
   $('branch-board').append(chain, element('p', '', step.terminal ? 'Раунд завершён.' : `Ходит: ${analysis.players[step.turn].name} · концы ${step.ends.join(' и ') || 'заход'}`));
   const hands = element('div', 'hands');
@@ -552,14 +564,7 @@ function renderStep() {
     $('probabilities').append(card);
   }
   $('turn-label').textContent = step.terminal ? 'Раунд завершён' : `Ходит: ${analysis.players[step.turn].name}`;
-  const tileTeams = chainTeams(step.chain, analysis.steps[0].hands);
-  $('chain').replaceChildren(...(step.chain.length ? step.chain.map((stone, i) => {
-    const tile = domino(stone, 'chain'), team = tileTeams[i];
-    tile.classList.add(`tile-team-${team}`);
-    tile.title = `${stone} · ${analysis.teams[team]}`;
-    tile.setAttribute('aria-label', `${stone.replace('-', '–')} · ${analysis.teams[team]}`);
-    return tile;
-  }) : [element('span', 'chain-empty', 'Цепочка ещё не начата')]));
+  $('chain').replaceChildren(...(step.chain.length ? chainTiles(step.chain) : [element('span', 'chain-empty', 'Цепочка ещё не начата')]));
   $('ends').textContent = step.ends.length ? `Открытые концы: ${step.ends.join(' и ')}${step.fisher >= 0 ? ` · Последний недубль: ${analysis.players[step.fisher].name}` : ''}` : `Заходит: ${analysis.players[step.turn].name}`;
   $('hands').replaceChildren();
   step.hands.forEach((stones, p) => {
