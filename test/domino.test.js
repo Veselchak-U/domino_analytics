@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { chainTeams } from '../public/domino.js';
+import { chainTeams, pipCoordinates } from '../public/domino.js';
 import { parseGame } from '../src/input.js';
 import { stonesOf } from '../src/game.js';
 
@@ -30,5 +30,13 @@ test('все префиксы реальных раундов, включая п
         assert.deepEqual(chainTeams(step.chain, hands), expected);
       }
     }
+  }
+});
+test('шесть точек: горизонтальная фишка — два ряда, вертикальная — две колонки', () => {
+  for (const vertical of [false, true]) {
+    const points = pipCoordinates(6, vertical);
+    assert.equal(points.length, 6);
+    assert.equal(new Set(points.map(p => p[0])).size, vertical ? 2 : 3);
+    assert.equal(new Set(points.map(p => p[1])).size, vertical ? 3 : 2);
   }
 });

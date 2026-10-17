@@ -1,5 +1,5 @@
 import { keyEpisodes, summarizePlayerQuality } from './quality.js';
-import { chainTeams } from './domino.js';
+import { chainTeams, pipCoordinates } from './domino.js';
 import { trainingQuestion, gradeTrainingChoice, trainingPositions, trainingProgress } from './training.js';
 import { aggregateImpacts, alternativeImpact, comparisonChance, decisionQuality, decisionSpread } from './impact.js';
 import { formatCacheSize, formatPointDifference } from './format.js';
@@ -15,6 +15,7 @@ let roundAnalyses = new Map(), stopQueue = false, selectedRound = 1;
 let backgroundCalculation = false;
 let episodeMinimum = 3;
 let training = null, trainingAttempts = [], trainingSequence = 0;
+let branch = null;
 let chartWidth = 960;
 const chartInsets = { left: 120, right: 40 };
 
@@ -34,6 +35,7 @@ function setBusy(value) {
   for (const id of ['file', 'examples', 'demo']) $(id).disabled = value;
   for (const button of $('round-list').children) button.disabled = value;
   $('analyze-game').disabled = value;
+  $('explore-current').disabled = value || !analysis;
   updateRoundButtons();
 }
 async function api(url, data, method = data === undefined ? 'GET' : 'POST') {
@@ -133,19 +135,15 @@ function renderOutcomeComposition(result, title) {
   details.append(element('p', 'muted', 'Точные количества и доли от всех исходов этой позиции. Строки не пересекаются: яйца выделены отдельно. Общая частота рыбы включает строки «Рыба» и «Яйца» и не равна доле выигрышных рыб.'));
   return details;
 }
-const pipLayout = [[], [[50, 50]], [[24, 24], [76, 76]], [[24, 24], [50, 50], [76, 76]],
-  [[24, 24], [76, 24], [24, 76], [76, 76]],
-  [[24, 24], [76, 24], [50, 50], [24, 76], [76, 76]],
-  [[24, 24], [76, 24], [24, 50], [76, 50], [24, 76], [76, 76]]];
-const doubleSixLayout = [[24, 24], [50, 24], [76, 24], [24, 76], [50, 76], [76, 76]];
 function domino(stone, layout) {
   const values = stone.split('-').map(Number);
+  const vertical = layout === 'hand' || (layout === 'chain' && values[0] === values[1]);
   const node = element('span', values[0] === values[1] ? 'domino double-domino' : 'domino');
   node.setAttribute('role', 'img'); node.setAttribute('aria-label', stone.replace('-', '–'));
   node.title = stone;
   for (const n of values) {
     const half = element('span', 'half');
-    for (const [x, y] of (stone === '6-6' && layout !== 'hand' ? doubleSixLayout : pipLayout[n])) {
+    for (const [x, y] of pipCoordinates(n, vertical)) {
       const pip = element('i', 'pip'); pip.style.left = `${x}%`; pip.style.top = `${y}%`; half.append(pip);
     }
     node.append(half);
@@ -333,7 +331,7 @@ function renderTraining() {
   if (valid) {
     const step = analysis.steps[training.position], question = trainingQuestion(step);
     const chain = element('div', 'chain');
-    chain.append(...(question.chain.length ? question.chain.map(stone => domino(stone)) : [element('span', 'chain-empty', 'Цепочка ещё не начата')]));
+    chain.append(...(question.chain.length ? question.chain.map(stone => domino(stone, 'chain')) : [element('span', 'chain-empty', 'Цепочка ещё не начата')]));
     $('training-board').append(chain, element('p', 'muted', `Открытые концы: ${question.ends.join(' и ') || 'заход'}`));
     const hands = element('div', 'hands');
     question.hands.forEach((stones, i) => {
@@ -366,6 +364,85 @@ function renderTraining() {
   }
   const progress = trainingProgress(trainingAttempts);
   $('training-progress').textContent = `Ответов: ${progress.attempts} · Лучших из значимых: ${progress.best} из ${progress.decisions} · Доля: ${progress.bestShare ? formatPointDifference(progress.bestShare) : '—'} · Средняя потеря: ${progress.averageLoss ? formatPointDifference(progress.averageLoss) : '—'} · Вынужденных: ${progress.forced} · Равноценных: ${progress.equivalent}`;
+}
+
+function openBranch(choice) {
+  if (!analysis || busy) { showMessage('Сначала остановите текущий расчёт.'); return; }
+  branch = { origin: stepIndex, result: null, position: 0, running: false, job: null, status: '' };
+  document.body.classList.add('branch-active'); $('branch-panel').hidden = false;
+  $('branch-title').focus(); requestBranch(choice ? [{ action: choice.action, ...(choice.stone ? { stone: choice.stone } : {}) }] : []);
+}
+function requestBranch(moves, example) {
+  if (!branch || branch.running) return;
+  const session = branch;
+  session.running = true; session.stop = false; session.status = 'Точный расчёт ветки…'; renderBranch();
+  session.pending = (async () => {
+    try {
+      let job = await api('/api/branch', { gameId: game.id, round: analysis.number, position: session.origin, moves, ...(example ? { example } : {}) });
+      session.job = job.id;
+      if (session.stop && job.status === 'running') job = await api('/api/jobs/' + job.id, undefined, 'DELETE');
+      while (job.status === 'running') {
+        session.status = `Ветка: ${nf.format(job.stats.nodes)} позиций · Кеш ≈ ${formatCacheSize(job.stats.cacheBytesEstimate)}`;
+        $('branch-status').textContent = session.status;
+        await new Promise(r => setTimeout(r, 300)); job = await api('/api/jobs/' + job.id);
+      }
+      if (job.status === 'done' && !session.stop) {
+        session.result = job.result; session.position = job.result.steps.length - 1;
+        session.status = job.cached ? 'Готово, результат из кеша.' : 'Точный расчёт завершён.';
+      } else if (job.status === 'error') throw new Error(job.error);
+      else session.status = 'Расчёт отменён. Предыдущее состояние сохранено.';
+    } catch (e) { session.status = e.message; }
+    finally { session.running = false; session.job = null; if (branch === session) renderBranch(); }
+  })();
+  return session.pending;
+}
+async function cancelBranch() {
+  if (!branch?.running) return;
+  branch.stop = true;
+  if (branch.job) await api('/api/jobs/' + branch.job, undefined, 'DELETE');
+}
+function renderBranch() {
+  $('branch-status').textContent = branch.status;
+  $('branch-cancel').disabled = !branch.running;
+  $('branch-reset').disabled = branch.running;
+  for (const id of ['branch-win', 'branch-loss', 'branch-draw']) $(id).disabled = branch.running || !branch.result;
+  $('branch-prev').disabled = branch.running || !branch.result || branch.position === 0;
+  $('branch-next').disabled = branch.running || !branch.result || branch.position === branch.result.steps.length - 1;
+  $('branch-board').replaceChildren(); $('branch-choices').replaceChildren();
+  const result = branch.result;
+  $('branch-context').textContent = `Альтернативная ветка · Раунд ${analysis.number} · от позиции ${branch.origin}. Реальный журнал сохранён.`;
+  if (!result) return;
+  const step = result.steps[branch.position], team = result.branch.referenceTeam;
+  const label = result.branch.example === 'win' ? `Пример выигрышного продолжения команды ${analysis.teams[team]}`
+    : result.branch.example === 'loss' ? `Пример проигрышного продолжения команды ${analysis.teams[team]}`
+    : result.branch.example === 'draw' ? 'Пример продолжения с ничьей партии' : 'Исследование выбранной ветки';
+  $('branch-context').textContent += ` Шаг ветки ${branch.position} / ${result.steps.length - 1}. ${label}.`;
+  const chain = element('div', 'chain'), owners = chainTeams(step.chain, analysis.steps[0].hands);
+  step.chain.forEach((stone, i) => { const tile = domino(stone, 'chain'); tile.classList.add(`tile-team-${owners[i]}`); chain.append(tile); });
+  if (!step.chain.length) chain.append(element('span', 'chain-empty', 'Цепочка ещё не начата'));
+  $('branch-board').append(chain, element('p', '', step.terminal ? 'Раунд завершён.' : `Ходит: ${analysis.players[step.turn].name} · концы ${step.ends.join(' и ') || 'заход'}`));
+  const hands = element('div', 'hands');
+  step.hands.forEach((stones, i) => {
+    const card = element('div', `hand ${i === step.turn && !step.terminal ? 'active' : ''}`), tiles = element('div', 'hand-stones');
+    tiles.append(...stones.map(s => domino(s, 'hand'))); card.append(element('div', 'hand-name', analysis.players[i].name), tiles); hands.append(card);
+  });
+  $('branch-board').append(hands, renderOutcomeComposition(step, 'Состав исходов ветки'), renderSuitProfile(step.suits));
+  if (step.terminal) $('branch-board').append(renderTerminalDecision({ before: result.context, outcome: result.outcome }));
+  const quality = decisionQuality(step);
+  for (const { alternative, best, loss } of quality.entries) {
+    const card = element('div', 'alternative'), button = element('button', 'button secondary', `Продолжить: ${actionText(alternative)}`);
+    button.disabled = branch.running;
+    button.addEventListener('click', () => requestBranch([...result.branch.path.slice(0, branch.position),
+      { action: alternative.action, ...(alternative.stone ? { stone: alternative.stone } : {}) }]));
+    if (alternative.stone) card.append(domino(alternative.stone)); card.append(button);
+    if (best && quality.kind !== 'forced') card.append(element('span', 'best-marker', 'Лучший по анализатору'));
+    if (alternative.actual) card.append(element('span', 'muted', 'Выбранное продолжение ветки'));
+    card.append(element('p', '', `Шанс команды ходящего: ${percent(alternative.probabilities[step.turn % 2], alternative.wins[step.turn % 2], alternative.leaves)}`));
+    if (quality.kind !== 'forced') card.append(element('p', '', `Потеря к лучшему: ${formatPointDifference(loss)}`));
+    card.append(renderMoveFacts(alternative.facts, step.turn), renderOutcomeComposition(alternative, 'Состав исходов хода'));
+    if (alternative.settlement) card.append(renderTerminalDecision(alternative.settlement));
+    $('branch-choices').append(card);
+  }
 }
 
 function renderKeyEpisodes() {
@@ -459,6 +536,7 @@ function selectStep(index) {
 function renderStep() {
   const step = analysis.steps[stepIndex];
   $('train-current').disabled = step.terminal;
+  $('explore-current').disabled = busy;
   for (const suffix of navigationSuffixes) {
     $(`slider${suffix}`).value = stepIndex;
     $(`first${suffix}`).disabled = $(`prev${suffix}`).disabled = stepIndex === 0;
@@ -476,7 +554,7 @@ function renderStep() {
   $('turn-label').textContent = step.terminal ? 'Раунд завершён' : `Ходит: ${analysis.players[step.turn].name}`;
   const tileTeams = chainTeams(step.chain, analysis.steps[0].hands);
   $('chain').replaceChildren(...(step.chain.length ? step.chain.map((stone, i) => {
-    const tile = domino(stone), team = tileTeams[i];
+    const tile = domino(stone, 'chain'), team = tileTeams[i];
     tile.classList.add(`tile-team-${team}`);
     tile.title = `${stone} · ${analysis.teams[team]}`;
     tile.setAttribute('aria-label', `${stone.replace('-', '–')} · ${analysis.teams[team]}`);
@@ -532,6 +610,8 @@ function renderStep() {
     if (alternative.facts) card.append(renderMoveFacts(alternative.facts, step.turn));
     if (alternative.settlement) card.append(renderTerminalDecision(alternative.settlement));
     card.append(renderOutcomeComposition(alternative, 'Состав исходов хода'));
+    const explore = element('button', 'button secondary', 'Исследовать ход');
+    explore.disabled = busy; explore.addEventListener('click', () => openBranch(alternative)); card.append(explore);
     $('alternatives').append(card);
   }
   if (!step.alternatives.length) $('alternatives').append(element('p', 'muted', 'Дальнейших ходов нет. Раунд завершён.'));
@@ -661,6 +741,16 @@ $('examples').addEventListener('change', async () => {
 });
 $('demo').addEventListener('click', () => importSource(() => api('/api/example', { name: 'demo' }), 'Учебная партия · 3 раунда'));
 $('analyze-game').addEventListener('click', analyzeGame);
+$('explore-current').addEventListener('click', () => openBranch());
+$('branch-cancel').addEventListener('click', () => cancelBranch().catch(e => { $('branch-status').textContent = e.message; }));
+$('branch-reset').addEventListener('click', () => requestBranch([]));
+for (const kind of ['win', 'loss', 'draw']) $(`branch-${kind}`).addEventListener('click', () => requestBranch(branch.result.branch.path.slice(0, branch.position), kind));
+for (const [id, delta] of [['branch-prev', -1], ['branch-next', 1]]) $(id).addEventListener('click', () => { branch.position += delta; renderBranch(); });
+$('branch-exit').addEventListener('click', async () => {
+  const session = branch;
+  try { await cancelBranch(); await session.pending; }
+  finally { branch = null; document.body.classList.remove('branch-active'); $('branch-panel').hidden = true; renderStep(); $('choices-title').focus(); }
+});
 $('train-current').addEventListener('click', () => { $('training-topic').value = 'all'; openTraining(); });
 $('training-topic').addEventListener('change', () => openTraining(0));
 $('training-next').addEventListener('click', () => openTraining((training?.position ?? -1) + 1));
@@ -691,7 +781,7 @@ for (const suffix of navigationSuffixes) {
   $(`next${suffix}`).addEventListener('click', () => selectStep(stepIndex + 1));
 }
 document.addEventListener('keydown', event => {
-  if (training) return;
+  if (training || branch) return;
   if (['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(event.target.tagName)) return;
   if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); selectStep(stepIndex + (event.key === 'ArrowRight' ? 1 : -1)); }
 });

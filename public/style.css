@@ -89,3 +89,5 @@ main{min-width:0}.section-top{flex-wrap:wrap}table{font-variant-numeric:tabular-
 body.training-active .sidebar,body.training-active main>:not(#training-panel){display:none!important}
 body.training-active main{margin:0 auto;width:100%;max-width:1200px;padding:20px}
 .training-choice{display:flex;align-items:center;gap:12px;margin-bottom:12px}#training-choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}#training-progress{line-height:1.7}#training-panel select{font:inherit;padding:8px;color:var(--ink);background:var(--surface);max-width:100%}
+body.branch-active .sidebar,body.branch-active main>:not(#branch-panel){display:none!important}
+body.branch-active main{margin:0 auto;width:100%;max-width:1200px;padding:20px}.branch-tools{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}#branch-choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-top:20px}#branch-board,#branch-choices>.alternative{min-width:0}#branch-context,#branch-status{line-height:1.7;overflow-wrap:anywhere}

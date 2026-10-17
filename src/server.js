@@ -80,11 +80,21 @@ export function createApp({ examplesDir = process.env.DOMINO_EXAMPLES_DIR ?? 'C:
         }
         return json(res, 200, importGame(text));
       }
-      if (req.method === 'POST' && route === '/api/analyze') {
-        const { gameId, round } = await body(req), game = games.get(gameId);
+      if (req.method === 'POST' && ['/api/analyze', '/api/branch'].includes(route)) {
+        const data = await body(req), { gameId, round } = data, game = games.get(gameId);
         if (!game) throw new Error('Загрузите журнал заново: его нет в памяти');
         if (!Number.isInteger(round) || round < 1 || round > game.summary.rounds.length) throw new Error('Неверный номер раунда');
-        const key = `${gameId}:${round}`, cached = completed.get(key);
+        let branch;
+        if (route === '/api/branch') {
+          const { position, moves, example } = data;
+          if (!Number.isInteger(position) || position < 0 || position > game.summary.rounds[round - 1].moves) throw new Error('Неверная позиция ветки');
+          if (!Array.isArray(moves) || moves.length > 128 || moves.some(m => !m || typeof m !== 'object'
+            || Object.keys(m).some(k => !['action', 'stone'].includes(k)) || !['start', 'left', 'right', 'pass'].includes(m.action)
+            || (m.action === 'pass' ? m.stone !== undefined : !/^[0-6]-[0-6]$/.test(m.stone)))) throw new Error('Неверный путь ветки');
+          if (example !== undefined && !['win', 'loss', 'draw'].includes(example)) throw new Error('Неверный режим примера');
+          branch = { position, moves: moves.map(({ action, stone }) => ({ action, ...(stone ? { stone } : {}) })), ...(example ? { example } : {}) };
+        }
+        const key = `${gameId}:${round}${branch ? ':branch:' + JSON.stringify(branch) : ''}`, cached = completed.get(key);
         if (cached) {
           remember(completed, key, cached);
           const job = { id: randomUUID(), status: 'done', result: cached, stats: cached.stats, cached: true };
@@ -96,7 +106,7 @@ export function createApp({ examplesDir = process.env.DOMINO_EXAMPLES_DIR ?? 'C:
           return json(res, 409, { error: 'Сначала отмените текущий расчёт' });
         }
         const job = { id: randomUUID(), key, status: 'running', stats: { nodes: 0, hits: 0, cached: 0, evicted: 0, cacheBytesEstimate: 0, elapsedMs: 0 } };
-        const worker = new Worker(new URL('./worker.js', import.meta.url), { workerData: { text: game.text, round } });
+        const worker = new Worker(new URL('./worker.js', import.meta.url), { workerData: { text: game.text, round, branch } });
         job.worker = worker; active = job;
         remember(jobs, job.id, job);
         const finish = () => { if (active === job) active = null; delete job.worker; };

@@ -1,4 +1,12 @@
 const canonical = stone => stone.split('-').map(Number).sort((a, b) => a - b).join('-');
+const pips = [[], [[50, 50]], [[24, 24], [76, 76]], [[24, 24], [50, 50], [76, 76]],
+  [[24, 24], [76, 24], [24, 76], [76, 76]],
+  [[24, 24], [76, 24], [50, 50], [24, 76], [76, 76]],
+  [[24, 24], [76, 24], [24, 50], [76, 50], [24, 76], [76, 76]]];
+/** Every six follows the tile's physical orientation, regardless of the other half. */
+export function pipCoordinates(value, vertical) {
+  return value === 6 && !vertical ? [[24, 24], [50, 24], [76, 24], [24, 76], [50, 76], [76, 76]] : pips[value];
+}
 
 /** Team of each chain tile, from the four seat-ordered initial hands.
  * Ownership is fixed throughout a round, including reverse orientation and passes.
