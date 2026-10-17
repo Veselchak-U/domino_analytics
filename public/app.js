@@ -1,4 +1,4 @@
-import { summarizePlayerQuality } from './quality.js';
+import { keyEpisodes, summarizePlayerQuality } from './quality.js';
 import { aggregateImpacts, alternativeImpact, comparisonChance, decisionQuality, decisionSpread } from './impact.js';
 import { formatCacheSize, formatPointDifference } from './format.js';
 import { revealChartStep } from './navigation.js';
@@ -232,6 +232,38 @@ function renderQualitySummary() {
   }
 }
 
+function renderKeyEpisodes() {
+  const groups = keyEpisodes(analysis);
+  $('episodes-round').textContent = `Раунд ${analysis.number}`;
+  $('episode-groups').replaceChildren();
+  for (const [key, title, metric, label] of [
+    ['losses', 'Упущенные возможности', 'loss', 'Потеря'],
+    ['gains', 'Рост оценки', 'impact', 'Влияние'],
+    ['drops', 'Снижение оценки', 'impact', 'Влияние'],
+    ['spreads', 'Разброс альтернатив', 'range', 'Разброс'],
+  ]) {
+    const group = element('section', 'episode-group');
+    group.dataset.category = key;
+    group.append(element('h3', '', title));
+    const list = element('ol', 'episode-list');
+    for (const episode of groups[key]) {
+      const item = element('li'), button = element('button', 'episode-button');
+      button.type = 'button'; button.dataset.position = episode.position;
+      button.setAttribute('aria-label', `Перед ходом ${episode.actionStep}: ${episode.move.player}, ${label.toLowerCase()} ${formatPointDifference(episode[metric], metric === 'impact')}`);
+      button.append(element('span', '', `Ход ${episode.actionStep} · ${episode.move.player} · ${actionText(episode.move)}`),
+        element('strong', '', `${label} ${formatPointDifference(episode[metric], metric === 'impact')} →`));
+      button.addEventListener('click', () => {
+        selectStep(episode.position);
+        $('choices-title').focus({ preventScroll: true });
+        $('choices-title').scrollIntoView({ block: 'start' });
+      });
+      item.append(button); list.append(item);
+    }
+    group.append(groups[key].length ? list : element('p', 'muted', 'Подходящих эпизодов нет.'));
+    $('episode-groups').append(group);
+  }
+}
+
 function renderAnalysis() {
   chartWidth = Math.max(960, (analysis.steps.length - 1) * 64 + chartInsets.left + chartInsets.right);
   $('charts-canvas').style.minWidth = `${chartWidth}px`;
@@ -277,7 +309,7 @@ function renderAnalysis() {
     row.append(element('td', 'draw', percent(step.probabilities[2], step.wins[2], step.leaves)));
     $('history').append(row);
   }
-  renderPlayerImpacts(); renderStep();
+  renderPlayerImpacts(); renderKeyEpisodes(); renderStep();
 }
 
 function selectStep(index) {
@@ -319,6 +351,9 @@ function renderStep() {
       element('div', 'muted', `Победитель раунда по исходным правилам: ${o.winnerTeam === null ? 'не назначается' : analysis.teams[o.winnerTeam]}. Завершил: ${analysis.players[o.finishedPlayer].name}.`));
   }
   const quality = decisionQuality(step);
+  $('choice-position').textContent = quality.actual
+    ? `Позиция ${stepIndex} · перед ходом ${stepIndex + 1}: ${analysis.steps[stepIndex + 1].move.player}`
+    : `Позиция ${stepIndex} · записанного следующего хода нет`;
   const choiceLabels = { forced: 'Вынужденный ход', equivalent: 'Равноценный выбор', choice: 'Разные оценки' };
   $('choice-status').textContent = quality.kind === 'terminal' ? 'Раунд завершён'
     : quality.kind === 'forced' ? choiceLabels.forced : `${choiceLabels[quality.kind]} · Лучших вариантов: ${quality.bestCount} из ${quality.entries.length}`;

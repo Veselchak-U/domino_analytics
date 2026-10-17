@@ -1,4 +1,4 @@
-import { decisionQuality } from './impact.js';
+import { decisionQuality, decisionSpread, probabilityDifference } from './impact.js';
 
 /** @typedef {{numerator: bigint, denominator: bigint}} Fraction */
 /** @typedef {{decisions:number,best:number,forced:number,equivalent:number,unavailable:number,
@@ -61,4 +61,33 @@ export function summarizePlayerQuality(analyses, players, totalRounds) {
     if (row.maxLoss && (!totals[i].maxLoss || compare(row.maxLoss, totals[i].maxLoss) > 0n)) totals[i].maxLoss = row.maxLoss;
   });
   return { byRound, completedRounds, complete, players: complete ? totals.map(finish) : null };
+}
+
+/** A recorded decision is anchored to the position BEFORE its action.
+ * @typedef {{position:number,actionStep:number,move:object,actual:object,best:object[],
+ * loss:Fraction,impact:Fraction,range:Fraction}} Episode
+ */
+/** Rank each metric independently using exact fractions; never mutate analysis.
+ * @returns {{losses:Episode[],gains:Episode[],drops:Episode[],spreads:Episode[]}}
+ */
+export function keyEpisodes(analysis, limit = 5) {
+  const episodes = [];
+  for (let position = 0; position < analysis.steps.length - 1; position++) {
+    const step = analysis.steps[position], move = analysis.steps[position + 1].move;
+    const quality = decisionQuality(step);
+    if (!move || !quality.actual) continue;
+    const actual = quality.actual.alternative;
+    episodes.push({ position, actionStep: position + 1, move, actual,
+      best: quality.entries.filter(e => e.best).map(e => e.alternative), loss: quality.actual.loss,
+      impact: probabilityDifference(actual, step, step.turn % 2), range: decisionSpread(step).range });
+  }
+  function ranked(metric, negative = false) {
+    return episodes.filter(e => negative ? e[metric].numerator < 0n : e[metric].numerator > 0n)
+      .sort((a, b) => {
+        const difference = compare(a[metric], b[metric]);
+        return difference === 0n ? a.actionStep - b.actionStep
+          : (difference > 0n ? 1 : -1) * (negative ? 1 : -1);
+      }).slice(0, limit);
+  }
+  return { losses: ranked('loss'), gains: ranked('impact'), drops: ranked('impact', true), spreads: ranked('range') };
 }

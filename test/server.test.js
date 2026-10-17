@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createApp } from '../src/server.js';
 import { decisionQuality } from '../public/impact.js';
-import { summarizePlayerQuality } from '../public/quality.js';
+import { keyEpisodes, summarizePlayerQuality } from '../public/quality.js';
 
 test('локальный HTTP: проверка, worker, отмена, повтор, кеш и восстановление после ошибки', { timeout: 120000 }, async () => {
   const app = createApp({ examplesDir: new URL('./fixtures', import.meta.url).pathname });
@@ -67,6 +67,23 @@ test('локальный HTTP: проверка, worker, отмена, повт�
       assert.ok(p.best <= p.decisions);
       if (p.averageLoss) assert.ok(p.averageLoss.numerator >= 0n);
     });
+    for (const [category, episodes] of Object.entries(keyEpisodes(result))) {
+      assert.ok(episodes.length <= 5);
+      for (const e of episodes) {
+        const before = result.steps[e.position], after = result.steps[e.actionStep];
+        const team = before.turn % 2;
+        assert.equal(e.actionStep, e.position + 1);
+        assert.equal(e.move, after.move);
+        assert.equal(e.actual.actual, true);
+        // The actual child and the next real solver position are the same distribution.
+        assert.equal(BigInt(e.actual.wins[team]) * BigInt(after.leaves), BigInt(after.wins[team]) * BigInt(e.actual.leaves));
+        assert.ok(e.best.length > 0);
+        assert.ok(e.loss.numerator >= 0n && e.range.numerator > 0n);
+        if (category === 'losses') assert.ok(e.loss.numerator > 0n);
+        if (category === 'gains') assert.ok(e.impact.numerator > 0n);
+        if (category === 'drops') assert.ok(e.impact.numerator < 0n);
+      }
+    }
     for (const step of result.steps) {
       assert.equal(step.hands.flat().length + step.chain.length, 28);
       assert.equal(step.wins.reduce((n, s) => n + BigInt(s), 0n), BigInt(step.leaves));
