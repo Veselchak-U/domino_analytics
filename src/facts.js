@@ -1,4 +1,4 @@
-import { applyMove, countBits, handPoints, isTerminal, legalMoves, STONES, SUITS } from './game.js';
+import { applyMove, countBits, handPoints, isTerminal, legalMoves, settle, STONES, SUITS } from './game.js';
 
 function handFacts(mask) {
   return { count: countBits(mask), points: handPoints(mask),
@@ -51,4 +51,10 @@ export function moveFacts(position, action) {
     else if (legalMoves(later).some(m => m.action !== 'pass')) result.partner.replies++;
   }
   return result;
+}
+
+/** Immediate settlement only. Keep the scoring context alongside its result for audit. */
+export function terminalDecision(position, action, context) {
+  const outcome = settle(applyMove(position, action), context);
+  return outcome ? { before: { score: [...context.score], fence: [...context.fence], eggs: context.eggs }, outcome } : null;
 }

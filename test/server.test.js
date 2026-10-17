@@ -101,6 +101,8 @@ test('локальный HTTP: проверка, worker, отмена, повт�
         assert.deepEqual(quality.actual.alternative.facts.after.map(h => h.count), next.hands.map(h => h.length));
         assert.equal(quality.actual.alternative.facts.terminal, next.terminal);
         assert.deepEqual(quality.actual.alternative.facts.profile, next.suits);
+        if (next.terminal) assert.deepEqual(quality.actual.alternative.settlement.outcome, result.outcome);
+        else assert.equal(quality.actual.alternative.settlement, null);
         assert.deepEqual(quality.actual.alternative.wins, next.wins);
         assert.equal(quality.actual.alternative.leaves, next.leaves);
         assert.equal(BigInt(step.leaves), step.alternatives.reduce((sum, a) => sum + BigInt(a.leaves), 0n));

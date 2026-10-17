@@ -96,6 +96,20 @@ function renderSuitProfile(profile) {
   }
   table.append(body); wrap.append(table); details.append(wrap); return details;
 }
+function renderTerminalDecision(decision) {
+  const { before, outcome: o } = decision;
+  const reason = { emptyHand: 'Выход', fish: 'Рыба', eggs: 'Рыба с яйцами' }[o.reason];
+  const name = team => team === null ? 'не назначен' : team === 2 ? 'Ничья партии' : analysis.teams[team];
+  const details = element('details', 'candidate-facts settlement-review');
+  details.append(element('summary', '', `Завершение раунда: ${reason}`));
+  details.append(element('p', '', `Завершил: ${analysis.players[o.finishedPlayer].name}. Победитель по правилам: ${name(o.winnerTeam)}. Аналитический победитель: ${name(o.analyticsWinner)}.`));
+  for (let t = 0; t < 2; t++) details.append(element('p', '', `${analysis.teams[t]}: остаток ${o.residual[t]}; начислено за раунд ${o.roundScore[t]}; забор ${before.fence[t]} → ${o.fence[t]}; счёт ${before.score[t]} → ${o.totalScore[t]}.`));
+  details.append(element('p', '', `Банк яиц: ${before.eggs} → ${o.eggs}. ${o.gameWinner === null ? 'Партия продолжается.' : `Партия завершена: ${name(o.gameWinner)}.`}`));
+  if (o.reason !== 'emptyHand') details.append(element('p', 'muted', o.gameWinner === null
+    ? 'Партия не завершена: аналитический исход рыбы относится к команде рыбака. Дубль не меняет рыбака.'
+    : 'Партия завершена: аналитический исход рыбы определяется итогом партии, включая ничью, независимо от команды рыбака.'));
+  return details;
+}
 const pipLayout = [[], [[50, 50]], [[24, 24], [76, 76]], [[24, 24], [50, 50], [76, 76]],
   [[24, 24], [76, 24], [24, 76], [76, 76]],
   [[24, 24], [76, 24], [50, 50], [24, 76], [76, 76]],
@@ -424,6 +438,7 @@ function renderStep() {
     if (quality.kind !== 'forced') card.append(element('div', `opportunity-loss ${loss.numerator > 0n ? 'negative' : ''}`, `Потеря к лучшему: ${formatPointDifference(loss)}`));
     card.append(chances, bar, element('div', 'alt-leaves', `${nf.format(BigInt(alternative.leaves))} исходов · ничья ${percent(alternative.probabilities[2], alternative.wins[2], alternative.leaves)}`));
     if (alternative.facts) card.append(renderMoveFacts(alternative.facts, step.turn));
+    if (alternative.settlement) card.append(renderTerminalDecision(alternative.settlement));
     $('alternatives').append(card);
   }
   if (!step.alternatives.length) $('alternatives').append(element('p', 'muted', 'Дальнейших ходов нет. Раунд завершён.'));

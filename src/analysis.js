@@ -1,7 +1,7 @@
 import { applyMove, countBits, handPoints, legalMoves, positionKey, stonesOf } from './game.js';
 import { createSolver, summarize } from './solver.js';
 import { attributeImpacts, bestOptionsAtSteps, worstOptionsAtSteps } from '../public/impact.js';
-import { moveFacts, suitProfile } from './facts.js';
+import { moveFacts, suitProfile, terminalDecision } from './facts.js';
 
 export function gameSummary(game) {
   return { teams: game.teams, players: game.players, fishVariant: game.fishVariant,
@@ -25,6 +25,7 @@ export function analyzeRound(game, roundIndex, onProgress) {
     const alternatives = legalMoves(state).map(action => {
       const next = applyMove(state, action);
       return { ...action, ...summarize(solver.solve(next)), facts: moveFacts(state, action),
+        settlement: terminalDecision(state, action, round.context),
         actual: !!nextRecorded && positionKey(next) === positionKey(nextRecorded.state) };
     });
     const hands = state.hands.map(stonesOf);
