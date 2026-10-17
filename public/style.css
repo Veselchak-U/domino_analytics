@@ -86,3 +86,6 @@ main{min-width:0}.section-top{flex-wrap:wrap}table{font-variant-numeric:tabular-
 .welcome-tiles{gap:14px;padding:12px 0}.welcome-tiles>.domino{--tile-size:36px;--pip-size:8px}.welcome-tiles>.domino:first-child{transform:rotate(-12deg)}.welcome-tiles>.domino:last-child{transform:rotate(10deg)}
 .chain .tile-team-0{border-color:color-mix(in srgb,var(--a) 65%,var(--line))}
 .chain .tile-team-1{border-color:color-mix(in srgb,var(--b) 65%,var(--line))}
+body.training-active .sidebar,body.training-active main>:not(#training-panel){display:none!important}
+body.training-active main{margin:0 auto;width:100%;max-width:1200px;padding:20px}
+.training-choice{display:flex;align-items:center;gap:12px;margin-bottom:12px}#training-choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}#training-progress{line-height:1.7}#training-panel select{font:inherit;padding:8px;color:var(--ink);background:var(--surface);max-width:100%}

@@ -1,5 +1,6 @@
 import { keyEpisodes, summarizePlayerQuality } from './quality.js';
 import { chainTeams } from './domino.js';
+import { trainingQuestion, gradeTrainingChoice, trainingPositions, trainingProgress } from './training.js';
 import { aggregateImpacts, alternativeImpact, comparisonChance, decisionQuality, decisionSpread } from './impact.js';
 import { formatCacheSize, formatPointDifference } from './format.js';
 import { revealChartStep } from './navigation.js';
@@ -13,6 +14,7 @@ let game = null, analysis = null, stepIndex = 0, activeJob = null, busy = false;
 let roundAnalyses = new Map(), stopQueue = false, selectedRound = 1;
 let backgroundCalculation = false;
 let episodeMinimum = 3;
+let training = null, trainingAttempts = [], trainingSequence = 0;
 let chartWidth = 960;
 const chartInsets = { left: 120, right: 40 };
 
@@ -156,13 +158,13 @@ async function importSource(request, name) {
   setBusy(true); showMessage('Проверяем журнал и воспроизводим ходы…');
   try {
     game = await request();
-    roundAnalyses = new Map(); stopQueue = false;
+    roundAnalyses = new Map(); stopQueue = false; trainingAttempts = []; training = null;
     analysis = null;
     $('dashboard').hidden = true; $('game-meta').hidden = false;
     $('source-name').textContent = name;
     $('game-source').textContent = `Партия: ${name}`;
     $('game-source').hidden = false;
-    const variant = `Козёл, 2x2, до ${game.scoreLimit} ${game.scoreLimit === 101 ? 'очка' : 'очков'}, ${game.fishVariant === 'withEggs' ? 'с яйцами' : 'без яиц'}`;
+    const variant = `Козёл, 2×2, до ${game.scoreLimit} ${game.scoreLimit === 101 ? 'очка' : 'очков'}, ${game.fishVariant === 'withEggs' ? 'рыба с яйцами' : 'рыба без яиц'}`;
     $('rules-label').textContent = variant;
     $('game-variant').textContent = `Вариант игры: ${variant}`;
     selectedRound = game.rounds[0].number; $('round-list').replaceChildren();
@@ -311,6 +313,61 @@ function renderQualitySummary() {
   }
 }
 
+function openTraining(position = stepIndex) {
+  if (!analysis) return;
+  const positions = trainingPositions(analysis, $('training-topic').value);
+  const selected = positions.find(p => p >= position) ?? positions[0];
+  training = selected === undefined ? { position: null } : { position: selected, id: ++trainingSequence, choice: null, grade: null };
+  document.body.classList.add('training-active'); $('training-panel').hidden = false;
+  renderTraining(); $('training-title').focus();
+}
+function renderTraining() {
+  const positions = trainingPositions(analysis, $('training-topic').value);
+  const valid = training.position !== null;
+  $('training-context').textContent = valid
+    ? `Раскрытые руки · Раунд ${analysis.number} · позиция ${training.position} · ходит ${analysis.players[analysis.steps[training.position].turn].name}`
+    : 'В этом раунде нет позиций по выбранной теме. Выберите другую тему.';
+  $('training-board').replaceChildren(); $('training-choices').replaceChildren();
+  $('training-feedback').textContent = '';
+  $('training-next').disabled = !positions.length;
+  if (valid) {
+    const step = analysis.steps[training.position], question = trainingQuestion(step);
+    const chain = element('div', 'chain');
+    chain.append(...(question.chain.length ? question.chain.map(stone => domino(stone)) : [element('span', 'chain-empty', 'Цепочка ещё не начата')]));
+    $('training-board').append(chain, element('p', 'muted', `Открытые концы: ${question.ends.join(' и ') || 'заход'}`));
+    const hands = element('div', 'hands');
+    question.hands.forEach((stones, i) => {
+      const card = element('div', `hand ${i === question.turn ? 'active' : ''}`), tiles = element('div', 'hand-stones');
+      tiles.append(...stones.map(stone => domino(stone, 'hand')));
+      card.append(element('div', 'hand-name', analysis.players[i].name), tiles); hands.append(card);
+    });
+    $('training-board').append(hands);
+    question.choices.forEach((choice, i) => {
+      const card = element('div', 'alternative'), button = element('button', 'button secondary training-choice');
+      if (choice.stone) button.append(domino(choice.stone));
+      button.append(document.createTextNode(actionText(choice))); button.disabled = !!training.grade;
+      button.addEventListener('click', () => {
+        if (training.grade) return;
+        training.choice = i; training.grade = gradeTrainingChoice(step, choice);
+        trainingAttempts.push({ id: training.id, ...training.grade }); renderTraining();
+      });
+      card.append(button);
+      if (training.grade) {
+        const grade = gradeTrainingChoice(step, choice), original = step.alternatives[i];
+        if (grade.best) card.append(element('span', 'best-marker', 'Лучший по анализатору'));
+        if (original.actual) card.append(element('span', 'actual', 'В игре'));
+        if (training.choice === i) card.append(element('strong', '', 'Ваш ответ'));
+        card.append(element('p', '', `Шанс своей команды: ${percent(original.probabilities[step.turn % 2], original.wins[step.turn % 2], original.leaves)} · Потеря: ${formatPointDifference(grade.loss)}`));
+        if (original.facts) card.append(renderMoveFacts(original.facts, step.turn));
+      }
+      $('training-choices').append(card);
+    });
+    if (training.grade) $('training-feedback').textContent = `${training.grade.kind === 'forced' ? 'Вынужденный ход' : training.grade.kind === 'equivalent' ? 'Равноценный выбор' : training.grade.best ? 'Один из точных максимумов — ответ засчитан' : 'Есть вариант с большей точной долей'}. Упущенная возможность по анализатору: ${formatPointDifference(training.grade.loss)}.`;
+  }
+  const progress = trainingProgress(trainingAttempts);
+  $('training-progress').textContent = `Ответов: ${progress.attempts} · Лучших из значимых: ${progress.best} из ${progress.decisions} · Доля: ${progress.bestShare ? formatPointDifference(progress.bestShare) : '—'} · Средняя потеря: ${progress.averageLoss ? formatPointDifference(progress.averageLoss) : '—'} · Вынужденных: ${progress.forced} · Равноценных: ${progress.equivalent}`;
+}
+
 function renderKeyEpisodes() {
   const groups = keyEpisodes(analysis, 5, episodeMinimum);
   $('episodes-round').textContent = `Раунд ${analysis.number}`;
@@ -337,6 +394,9 @@ function renderKeyEpisodes() {
         $('choices-title').scrollIntoView({ block: 'start' });
       });
       item.append(button); list.append(item);
+      const train = element('button', 'button secondary', 'Тренировать');
+      train.addEventListener('click', () => { $('training-topic').value = 'all'; openTraining(episode.position); });
+      item.append(train);
     }
     group.append(groups[key].length ? list : element('p', 'muted', 'Эпизодов по этому фильтру нет.'));
     $('episode-groups').append(group);
@@ -398,6 +458,7 @@ function selectStep(index) {
 }
 function renderStep() {
   const step = analysis.steps[stepIndex];
+  $('train-current').disabled = step.terminal;
   for (const suffix of navigationSuffixes) {
     $(`slider${suffix}`).value = stepIndex;
     $(`first${suffix}`).disabled = $(`prev${suffix}`).disabled = stepIndex === 0;
@@ -600,6 +661,12 @@ $('examples').addEventListener('change', async () => {
 });
 $('demo').addEventListener('click', () => importSource(() => api('/api/example', { name: 'demo' }), 'Учебная партия · 3 раунда'));
 $('analyze-game').addEventListener('click', analyzeGame);
+$('train-current').addEventListener('click', () => { $('training-topic').value = 'all'; openTraining(); });
+$('training-topic').addEventListener('change', () => openTraining(0));
+$('training-next').addEventListener('click', () => openTraining((training?.position ?? -1) + 1));
+$('training-exit').addEventListener('click', () => {
+  training = null; document.body.classList.remove('training-active'); $('training-panel').hidden = true;
+});
 $('episode-minimum').addEventListener('input', () => {
   const input = $('episode-minimum');
   const valid = input.value !== '' && input.checkValidity();
@@ -624,6 +691,7 @@ for (const suffix of navigationSuffixes) {
   $(`next${suffix}`).addEventListener('click', () => selectStep(stepIndex + 1));
 }
 document.addEventListener('keydown', event => {
+  if (training) return;
   if (['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(event.target.tagName)) return;
   if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); selectStep(stepIndex + (event.key === 'ArrowRight' ? 1 : -1)); }
 });

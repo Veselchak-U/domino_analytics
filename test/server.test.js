@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { createApp } from '../src/server.js';
 import { decisionQuality } from '../public/impact.js';
 import { keyEpisodes, summarizePlayerQuality } from '../public/quality.js';
+import { trainingQuestion, gradeTrainingChoice } from '../public/training.js';
 
 test('локальный HTTP: проверка, worker, отмена, повтор, кеш и восстановление после ошибки', { timeout: 120000 }, async () => {
   const app = createApp({ examplesDir: new URL('./fixtures', import.meta.url).pathname });
@@ -24,6 +25,7 @@ test('локальный HTTP: проверка, worker, отмена, повт�
     assert.equal((await fetch(base + '/impact.js')).status, 200);
     assert.equal((await fetch(base + '/quality.js')).status, 200);
     assert.equal((await fetch(base + '/domino.js')).status, 200);
+    assert.equal((await fetch(base + '/training.js')).status, 200);
     assert.equal((await fetch(base + '/format.js')).status, 200);
     const navigation = await fetch(base + '/navigation.js');
     assert.equal(navigation.status, 200);
@@ -103,6 +105,8 @@ test('локальный HTTP: проверка, worker, отмена, повт�
         const quality = decisionQuality(step);
         assert.equal(quality.entries.length, step.alternatives.length);
         assert.ok(quality.actual);
+        assert.equal(trainingQuestion(step).choices.length, step.alternatives.length);
+        assert.equal(gradeTrainingChoice(step, quality.actual.alternative).best, quality.actual.best);
         assert.ok(quality.entries.every(entry => entry.loss.numerator >= 0n));
         assert.equal(quality.bestCount, quality.entries.filter(entry => entry.loss.numerator === 0n).length);
         const next = result.steps[step.index + 1];
