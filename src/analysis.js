@@ -1,7 +1,7 @@
 import { applyMove, countBits, handPoints, legalMoves, positionKey, stonesOf } from './game.js';
 import { createSolver, summarize } from './solver.js';
 import { attributeImpacts, bestOptionsAtSteps, worstOptionsAtSteps } from '../public/impact.js';
-import { moveFacts } from './facts.js';
+import { moveFacts, suitProfile } from './facts.js';
 
 export function gameSummary(game) {
   return { teams: game.teams, players: game.players, fishVariant: game.fishVariant,
@@ -31,7 +31,7 @@ export function analyzeRound(game, roundIndex, onProgress) {
     const counts = state.hands.map(countBits), points = state.hands.map(handPoints);
     const delta = result.probabilities.map((p, t) => +(p - previous[t]).toFixed(4));
     previous = result.probabilities;
-    return { index, move, chain, hands, turn: state.turn, fisher: state.fisher,
+    return { index, move, chain, hands, suits: suitProfile(state), turn: state.turn, fisher: state.fisher,
       ends: state.left === null ? [] : [state.left, state.right], ...result, delta,
       counts: [counts[0] + counts[2], counts[1] + counts[3]],
       points: [points[0] + points[2], points[1] + points[3]],

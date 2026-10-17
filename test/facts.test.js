@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { maskOf, legalMoves, applyMove, countBits, isTerminal } from '../src/game.js';
 import { parseGame } from '../src/input.js';
-import { moveFacts } from '../src/facts.js';
+import { moveFacts, suitProfile } from '../src/facts.js';
 
 const state = (hands, extra = {}) => ({ hands: hands.map(maskOf), left: 1, right: 1,
   turn: 0, fisher: 3, forcedStart: null, ...extra });
@@ -47,6 +47,49 @@ test('факты всех кандидатов реального журнала
       assert.deepEqual(f.after.map(h => h.count), next.hands.map(countBits));
       assert.equal(f.after.reduce((n, h) => n + h.count, 0) + chain.length + (action.action === 'pass' ? 0 : 1), 28);
       if (f.next) assert.equal(f.next.forcedPass, legalMoves(next).every(m => m.action === 'pass'));
+    }
+  }
+});
+
+test('профиль мастей различает камни и половинки, команды и сыгранные', () => {
+  const s = state([['3-3', '3-4'], ['0-3'], ['3-5'], ['0-0']]);
+  const p = suitProfile(s), three = p.suits[3];
+  assert.deepEqual(three.players[0], { tiles: 2, halves: 3 });
+  assert.deepEqual(three.teams[0], { tiles: 3, halves: 4 });
+  assert.equal(three.playedTiles, 3);
+  assert.equal(three.playedHalves, 3);
+  assert.equal(three.remainingTiles, 4);
+  assert.equal(three.remainingHalves, 5);
+});
+test('контроль конца: закрытый, команда, один игрок, совместное владение', () => {
+  const s = state([['3-3', '3-4'], ['0-0'], ['3-5'], ['2-2']], { left: 1, right: 3 });
+  let p = suitProfile(s);
+  assert.equal(p.ends[0].kind, 'closed');
+  assert.equal(p.ends[0].team, null);
+  assert.equal(p.ends[1].kind, 'team');
+  assert.equal(p.ends[1].team, 0);
+  s.hands[2] = maskOf(['4-5']);
+  assert.equal(suitProfile(s).ends[1].kind, 'player');
+  s.hands[1] = maskOf(['0-3']);
+  assert.equal(suitProfile(s).ends[1].kind, 'shared');
+  s.right = 6;
+  assert.equal(suitProfile(s).terminal, true);
+  s.left = s.right = null;
+  assert.deepEqual(suitProfile(s).ends, []);
+});
+test('свежая масть берётся из цепочки до действия, а не из чужих рук', () => {
+  const game = parseGame(readFileSync(new URL('./fixtures/real-game.json', import.meta.url), 'utf8'));
+  for (const round of game.rounds) for (const { state: s, chain } of round.history) {
+    const seen = new Set(chain.flatMap(stone => stone.split('-').map(Number)));
+    const p = suitProfile(s);
+    for (const suit of p.suits) {
+      assert.equal(suit.remainingTiles + suit.playedTiles, 7);
+      assert.equal(suit.remainingHalves + suit.playedHalves, 8);
+      assert.equal(suit.playedTiles > 0, seen.has(suit.value));
+    }
+    for (const action of legalMoves(s)) {
+      assert.deepEqual(moveFacts(s, action).freshSuits,
+        [...new Set(action.stone?.split('-').map(Number) ?? [])].filter(n => !seen.has(n)));
     }
   }
 });

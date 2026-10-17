@@ -61,6 +61,8 @@ function renderMoveFacts(facts, actor) {
   const before = facts.before[actor], after = facts.after[actor];
   details.append(element('p', '', `Рука автора: камней ${before.count} → ${after.count}; очков остатка ${before.points} → ${after.points}; дублей ${before.doubles} → ${after.doubles}; покрытых мастей ${before.coverage.length} → ${after.coverage.length}.`));
   details.append(element('p', '', `Открытые концы: ${facts.ends.join(' и ')}. Совместимых камней у автора: ${facts.actorCompatible}.`));
+  details.append(element('p', '', `Новые значения в цепочке: ${facts.freshSuits.length ? facts.freshSuits.join(', ') : 'нет'}. Новизна относится к истории, а не к опасности хода.`));
+  details.append(renderSuitProfile(facts.profile));
   if (facts.terminal) details.append(element('p', '', 'Раунд завершён. Следующего хода нет.'));
   else {
     details.append(element('p', '', `${analysis.players[facts.next.player].name}: ${facts.next.forcedPass ? 'обязательный пас' : `допустимых выкладок — ${facts.next.choices}`}.`));
@@ -69,6 +71,30 @@ function renderMoveFacts(facts, actor) {
   }
   details.append(element('p', 'muted', 'Факты проверены с раскрытыми руками. Это не разложение влияния или потери на бонусы и не прогноз выбора игроков.'));
   return details;
+}
+function renderSuitProfile(profile) {
+  const details = element('details', 'candidate-facts');
+  details.append(element('summary', '', 'Масти и контроль концов'));
+  details.append(element('p', 'muted', 'Раскрытые руки. В ячейках: камни / половинки. Дубль — один камень и две половинки. Контроль означает текущее владение, а не гарантированный ход.'));
+  if (profile.terminal) details.append(element('p', '', 'Раунд завершён; следующего хода нет.'));
+  if (!profile.ends.length) details.append(element('p', '', 'Заход ещё не сделан, открытых концов нет.'));
+  profile.ends.forEach((end, i) => {
+    const owner = end.kind === 'closed' ? 'закрыт, ответов нет' : end.kind === 'player'
+      ? `исключительный контроль игрока ${analysis.players[end.players[0]].name}`
+      : end.kind === 'team' ? `исключительный контроль команды ${analysis.teams[end.team]}` : 'совместное владение команд';
+    details.append(element('p', '', `${i ? 'Правый' : 'Левый'} конец ${end.value}: ${owner}. Камни есть у: ${end.players.map(p => analysis.players[p].name).join(', ') || 'никого'}.`));
+  });
+  const wrap = element('div', 'history-scroll'), table = element('table'), head = element('tr');
+  for (const label of ['Масть', 'Осталось', 'Сыграно', ...analysis.players.map(p => p.name), ...analysis.teams.slice(0, 2)]) head.append(element('th', '', label));
+  const thead = element('thead'); thead.append(head); table.append(thead);
+  const body = element('tbody');
+  for (const suit of profile.suits) {
+    const row = element('tr');
+    for (const value of [suit.value, `${suit.remainingTiles} / ${suit.remainingHalves}`, `${suit.playedTiles} / ${suit.playedHalves}`,
+      ...suit.players.map(p => `${p.tiles} / ${p.halves}`), ...suit.teams.map(p => `${p.tiles} / ${p.halves}`)]) row.append(element('td', '', value));
+    body.append(row);
+  }
+  table.append(body); wrap.append(table); details.append(wrap); return details;
 }
 const pipLayout = [[], [[50, 50]], [[24, 24], [76, 76]], [[24, 24], [50, 50], [76, 76]],
   [[24, 24], [76, 24], [24, 76], [76, 76]],
@@ -253,9 +279,9 @@ function renderKeyEpisodes() {
   $('episodes-round').textContent = `Раунд ${analysis.number}`;
   $('episode-groups').replaceChildren();
   for (const [key, title, metric, label] of [
-    ['losses', 'Упущенные возможности', 'loss', 'Потеря'],
     ['gains', 'Рост оценки', 'impact', 'Влияние'],
     ['drops', 'Снижение оценки', 'impact', 'Влияние'],
+    ['losses', 'Упущенные возможности', 'loss', 'Потеря'],
     ['spreads', 'Разброс альтернатив', 'range', 'Разброс'],
   ]) {
     const group = element('section', 'episode-group');
@@ -360,6 +386,7 @@ function renderStep() {
     hand.append(...(stones.length ? stones.map(domino) : [element('span', 'muted', 'Пустая рука')])); card.append(hand); $('hands').append(card);
   });
   $('outcome').hidden = !step.terminal;
+  $('suit-profile').replaceChildren(renderSuitProfile(step.suits));
   if (step.terminal) {
     const o = analysis.outcome, reason = { emptyHand: 'Выход', fish: analysis.context.fishVariant === 'withEggs' ? 'Рыба' : 'Рыба без яиц', eggs: 'Рыба с яйцами' }[o.reason];
     const winner = o.analyticsWinner === 2 ? 'Ничья партии' : `Аналитический победитель: ${analysis.teams[o.analyticsWinner]}`;
