@@ -49,6 +49,16 @@ export function decisionQuality(step) {
   return { kind, bestCount, entries, actual: entries.find(entry => entry.alternative.actual) ?? null };
 }
 
+/** Exact spread and first-to-second gap; null means the comparison does not exist.
+ * @returns {{range: {numerator: bigint, denominator: bigint}|null, gap: {numerator: bigint, denominator: bigint}|null}}
+ */
+export function decisionSpread(step) {
+  const ranked = rankAlternatives(step), team = step.turn % 2;
+  if (!ranked.length) return { range: null, gap: null };
+  return { range: probabilityDifference(ranked[0], ranked.at(-1), team),
+    gap: ranked.length > 1 ? probabilityDifference(ranked[0], ranked[1], team) : null };
+}
+
 /** Independent maxima from the position before each recorded action. */
 export function bestOptionsAtSteps(steps, players) {
   return optionsAtSteps(steps, players, false);

@@ -1,4 +1,4 @@
-import { aggregateImpacts, alternativeImpact, comparisonChance, decisionQuality } from './impact.js';
+import { aggregateImpacts, alternativeImpact, comparisonChance, decisionQuality, decisionSpread } from './impact.js';
 import { formatCacheSize, formatPointDifference } from './format.js';
 import { revealChartStep } from './navigation.js';
 const $ = id => document.getElementById(id);
@@ -304,6 +304,8 @@ function renderStep() {
   const choiceLabels = { forced: 'Вынужденный ход', equivalent: 'Равноценный выбор', choice: 'Разные оценки' };
   $('choice-status').textContent = quality.kind === 'terminal' ? 'Раунд завершён'
     : `${choiceLabels[quality.kind]} · Лучших вариантов: ${quality.bestCount} из ${quality.entries.length}`;
+  const spread = decisionSpread(step);
+  $('choice-spread').textContent = `Разброс: ${spread.range ? formatPointDifference(spread.range) : '—'} · Отрыв лидера: ${spread.gap ? formatPointDifference(spread.gap) : quality.kind === 'forced' ? '— (нет второго варианта)' : '—'}`;
   $('recorded-choice').hidden = !quality.actual;
   if (quality.actual) {
     const { alternative, loss } = quality.actual;
