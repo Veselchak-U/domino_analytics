@@ -55,11 +55,11 @@ test('варианты сортируются от лучшего к худше�
   assert.deepEqual(alternatives, [bad, good, middle]);
 });
 
-test('среди отрицательных влияний первым идёт наименьшее ухудшение', () => {
-  const step = { turn: 0, probabilities: [60, 40, 0], alternatives: [
+test('сортировка включает улучшение, равенство и ухудшение относительно исходной доли', () => {
+  const step = { turn: 0, probabilities: [50, 50, 0], alternatives: [
     alternative('1-2', [45, 55, 0]), alternative('1-3', [55, 45, 0]), alternative('1-4', [50, 50, 0]),
   ] };
-  assert.deepEqual(rankAlternatives(step).map(a => alternativeImpact(step, a)), [-5, -10, -15]);
+  assert.deepEqual(rankAlternatives(step).map(a => alternativeImpact(step, a)), [5, 0, -5]);
 });
 
 test('сортировка точная при одинаковых округлённых шансах и разных знаменателях', () => {
@@ -149,12 +149,15 @@ test('лучший ход для B учитывает шанс B, а не мак
   assert.equal(result[1].impact.player, 1);
   assert.equal(result[1].impact.move.stone, '1-3');
 });
-test('лучшее влияние сохраняет минус, если все допустимые действия ухудшают шансы', () => {
-  const result = bestOptionsAtSteps([
-    { move: null, probabilities: [40, 60, 0], alternatives: [alternative('1-2', [10, 90, 0]), alternative('1-3', [20, 80, 0])] },
+test('исходная доля взвешена по листьям: лучшее влияние положительно, худшее отрицательно', () => {
+  const steps = [
+    { move: null, probabilities: [17.5, 82.5, 0], alternatives: [
+      alternative('1-2', [10, 90, 0]), alternative('1-3', [60, 240, 0], '300'),
+    ] },
     { move: { player: 'Анна' }, probabilities: [10, 90, 0], alternatives: [] },
-  ], players);
-  assert.equal(result[1].impact.value, -20);
+  ];
+  assert.equal(bestOptionsAtSteps(steps, players)[1].impact.value, 2.5);
+  assert.equal(worstOptionsAtSteps(steps, players)[1].impact.value, -7.5);
 });
 test('вынужденный пас имеет нулевое лучшее влияние', () => {
   const pass = { ...alternative(undefined, [40, 60, 0]), action: 'pass' };

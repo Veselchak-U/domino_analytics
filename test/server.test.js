@@ -60,11 +60,31 @@ test('локальный HTTP: проверка, worker, отмена, повт�
       assert.equal(step.hands.flat().length + step.chain.length, 28);
       assert.equal(step.wins.reduce((n, s) => n + BigInt(s), 0n), BigInt(step.leaves));
       if (!step.terminal) assert.equal(step.alternatives.filter(a => a.actual).length, 1);
+      if (!step.terminal) {
+        assert.equal(BigInt(step.leaves), step.alternatives.reduce((sum, a) => sum + BigInt(a.leaves), 0n));
+        for (let team = 0; team < 3; team++) {
+          assert.equal(BigInt(step.wins[team]), step.alternatives.reduce((sum, a) => sum + BigInt(a.wins[team]), 0n));
+          const differences = step.alternatives.map(a => BigInt(a.wins[team]) * BigInt(step.leaves)
+            - BigInt(step.wins[team]) * BigInt(a.leaves));
+          assert.ok(differences.some(value => value >= 0n));
+          assert.ok(differences.some(value => value <= 0n));
+          if (step.alternatives.length === 1) assert.equal(differences[0], 0n);
+        }
+      }
       for (let team = 0; team < 2; team++) {
         assert.ok(step.best.probabilities[team] >= step.probabilities[team]);
         assert.ok(step.worst.probabilities[team] <= step.probabilities[team]);
       }
-      if (step.move) assert.ok(step.best.impact.value >= step.impact.value - 0.000001);
+      if (step.move) {
+        assert.ok(step.best.impact.value >= 0);
+        assert.ok(step.worst.impact.value <= 0);
+        assert.ok(step.best.impact.value >= step.impact.value - 0.000001);
+        if (result.steps[step.index - 1].alternatives.length === 1) {
+          assert.equal(step.impact.value, 0);
+          assert.equal(step.best.impact.value, 0);
+          assert.equal(step.worst.impact.value, 0);
+        }
+      }
     }
     const cached = (await request('/api/analyze', { gameId: game.id, round: 1 })).data;
     assert.equal(cached.cached, true);
