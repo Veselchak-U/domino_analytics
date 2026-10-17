@@ -19,6 +19,13 @@ export function analyzeRound(game, roundIndex, onProgress) {
   return analyzeHistory(game, round, onProgress);
 }
 
+/** Analyze one already validated teaching position without solving its initial deal. */
+export function analyzeTeachingPosition(state, chain, context, onProgress) {
+  const players = ['Красный', 'Синий', 'Жёлтый', 'Зелёный'].map((name, i) => ({ name, seat: i + 1 }));
+  return analyzeHistory({ players, teams: ['Красный + Жёлтый', 'Синий + Зелёный'] },
+    { number: 1, context, history: [{ state, chain, move: null }], outcome: settle(state, context), recorded: null }, onProgress);
+}
+
 function analyzeHistory(game, round, onProgress, extend) {
   const solver = createSolver(round.context, onProgress);
   const base = summarize(solver.solve(round.history[0].state));

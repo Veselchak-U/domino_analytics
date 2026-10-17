@@ -1,3 +1,4 @@
+import { lessonCatalog } from './lessons.js';
 import http from 'node:http';
 import { readFile, readdir } from 'node:fs/promises';
 import { createHash, randomUUID } from 'node:crypto';
@@ -80,21 +81,33 @@ export function createApp({ examplesDir = process.env.DOMINO_EXAMPLES_DIR ?? 'C:
         }
         return json(res, 200, importGame(text));
       }
-      if (req.method === 'POST' && ['/api/analyze', '/api/branch'].includes(route)) {
-        const data = await body(req), { gameId, round } = data, game = games.get(gameId);
-        if (!game) throw new Error('Загрузите журнал заново: его нет в памяти');
-        if (!Number.isInteger(round) || round < 1 || round > game.summary.rounds.length) throw new Error('Неверный номер раунда');
-        let branch;
-        if (route === '/api/branch') {
-          const { position, moves, example } = data;
-          if (!Number.isInteger(position) || position < 0 || position > game.summary.rounds[round - 1].moves) throw new Error('Неверная позиция ветки');
-          if (!Array.isArray(moves) || moves.length > 128 || moves.some(m => !m || typeof m !== 'object'
-            || Object.keys(m).some(k => !['action', 'stone'].includes(k)) || !['start', 'left', 'right', 'pass'].includes(m.action)
-            || (m.action === 'pass' ? m.stone !== undefined : !/^[0-6]-[0-6]$/.test(m.stone)))) throw new Error('Неверный путь ветки');
-          if (example !== undefined && !['win', 'loss', 'draw'].includes(example)) throw new Error('Неверный режим примера');
-          branch = { position, moves: moves.map(({ action, stone }) => ({ action, ...(stone ? { stone } : {}) })), ...(example ? { example } : {}) };
+      if (req.method === 'GET' && route === '/api/lessons') return json(res, 200, { lessons: lessonCatalog() });
+      if (req.method === 'POST' && ['/api/analyze', '/api/branch', '/api/lesson'].includes(route)) {
+        const data = await body(req);
+        let key, workerData;
+        if (route === '/api/lesson') {
+          if (Object.keys(data).some(k => !['id', 'mirror'].includes(k)) || !lessonCatalog().some(l => l.id === data.id)
+            || (data.mirror !== undefined && typeof data.mirror !== 'boolean')) throw new Error('Неверные параметры упражнения');
+          key = 'lesson:' + data.id + ':' + !!data.mirror;
+          workerData = { lessonId: data.id, mirror: !!data.mirror };
+        } else {
+          const { gameId, round } = data, game = games.get(gameId);
+          if (!game) throw new Error('Загрузите журнал заново: его нет в памяти');
+          if (!Number.isInteger(round) || round < 1 || round > game.summary.rounds.length) throw new Error('Неверный номер раунда');
+          let branch;
+          if (route === '/api/branch') {
+            const { position, moves, example } = data;
+            if (!Number.isInteger(position) || position < 0 || position > game.summary.rounds[round - 1].moves) throw new Error('Неверная позиция ветки');
+            if (!Array.isArray(moves) || moves.length > 128 || moves.some(m => !m || typeof m !== 'object'
+              || Object.keys(m).some(k => !['action', 'stone'].includes(k)) || !['start', 'left', 'right', 'pass'].includes(m.action)
+              || (m.action === 'pass' ? m.stone !== undefined : !/^[0-6]-[0-6]$/.test(m.stone)))) throw new Error('Неверный путь ветки');
+            if (example !== undefined && !['win', 'loss', 'draw'].includes(example)) throw new Error('Неверный режим примера');
+            branch = { position, moves: moves.map(({ action, stone }) => ({ action, ...(stone ? { stone } : {}) })), ...(example ? { example } : {}) };
+          }
+          key = `${gameId}:${round}${branch ? ':branch:' + JSON.stringify(branch) : ''}`;
+          workerData = { text: game.text, round, branch };
         }
-        const key = `${gameId}:${round}${branch ? ':branch:' + JSON.stringify(branch) : ''}`, cached = completed.get(key);
+        const cached = completed.get(key);
         if (cached) {
           remember(completed, key, cached);
           const job = { id: randomUUID(), status: 'done', result: cached, stats: cached.stats, cached: true };
@@ -106,7 +119,7 @@ export function createApp({ examplesDir = process.env.DOMINO_EXAMPLES_DIR ?? 'C:
           return json(res, 409, { error: 'Сначала отмените текущий расчёт' });
         }
         const job = { id: randomUUID(), key, status: 'running', stats: { nodes: 0, hits: 0, cached: 0, evicted: 0, cacheBytesEstimate: 0, elapsedMs: 0 } };
-        const worker = new Worker(new URL('./worker.js', import.meta.url), { workerData: { text: game.text, round, branch } });
+        const worker = new Worker(new URL('./worker.js', import.meta.url), { workerData });
         job.worker = worker; active = job;
         remember(jobs, job.id, job);
         const finish = () => { if (active === job) active = null; delete job.worker; };
@@ -142,7 +155,7 @@ export function createApp({ examplesDir = process.env.DOMINO_EXAMPLES_DIR ?? 'C:
           return json(res, 200, view(job));
         }
       }
-      const assets = { '/training.js': ['training.js', 'text/javascript'], '/domino.js': ['domino.js', 'text/javascript'], '/quality.js': ['quality.js', 'text/javascript'], '/': ['index.html', 'text/html'], '/app.js': ['app.js', 'text/javascript'], '/theme.js': ['theme.js', 'text/javascript'], '/impact.js': ['impact.js', 'text/javascript'], '/format.js': ['format.js', 'text/javascript'], '/navigation.js': ['navigation.js', 'text/javascript'], '/style.css': ['style.css', 'text/css'] };
+      const assets = { '/tactics.js': ['tactics.js', 'text/javascript'], '/training.js': ['training.js', 'text/javascript'], '/domino.js': ['domino.js', 'text/javascript'], '/quality.js': ['quality.js', 'text/javascript'], '/': ['index.html', 'text/html'], '/app.js': ['app.js', 'text/javascript'], '/theme.js': ['theme.js', 'text/javascript'], '/impact.js': ['impact.js', 'text/javascript'], '/format.js': ['format.js', 'text/javascript'], '/navigation.js': ['navigation.js', 'text/javascript'], '/style.css': ['style.css', 'text/css'] };
       if (req.method === 'GET' && assets[route]) {
         const [file, type] = assets[route];
         const content = await readFile(path.join(PUBLIC, file));

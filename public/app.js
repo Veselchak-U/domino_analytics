@@ -1,3 +1,4 @@
+import { motifApplies } from './tactics.js';
 import { keyEpisodes, summarizePlayerQuality } from './quality.js';
 import { chainTeams, pipCoordinates } from './domino.js';
 import { trainingQuestion, gradeTrainingChoice, trainingPositions, trainingProgress } from './training.js';
@@ -16,6 +17,7 @@ let backgroundCalculation = false;
 let episodeMinimum = 3;
 let training = null, trainingAttempts = [], trainingSequence = 0;
 let branch = null;
+let tactics = null, tacticsCatalog = [], tacticsAttempts = [], tacticsSequence = 0;
 let chartWidth = 960;
 const chartInsets = { left: 120, right: 40 };
 
@@ -32,7 +34,7 @@ function showMessage(text, error = false) {
 }
 function setBusy(value) {
   busy = value;
-  for (const id of ['file', 'examples', 'demo']) $(id).disabled = value;
+  for (const id of ['file', 'examples', 'demo', 'open-tactics']) $(id).disabled = value;
   for (const button of $('round-list').children) button.disabled = value;
   $('analyze-game').disabled = value;
   $('explore-current').disabled = value || !analysis;
@@ -60,24 +62,24 @@ function actionText(move) {
   const action = { start: 'заход', left: 'слева', right: 'справа', pass: 'пропуск' }[move.action];
   return `${move.stone?.replace('-', '–') ?? ''} ${action}`.trim();
 }
-function renderMoveFacts(facts, actor) {
+function renderMoveFacts(facts, actor, context = analysis) {
   const details = element('details', 'candidate-facts');
   details.append(element('summary', '', 'Факты после хода'));
   const before = facts.before[actor], after = facts.after[actor];
   details.append(element('p', '', `Рука автора: камней ${before.count} → ${after.count}; очков остатка ${before.points} → ${after.points}; дублей ${before.doubles} → ${after.doubles}; покрытых мастей ${before.coverage.length} → ${after.coverage.length}.`));
   details.append(element('p', '', `Открытые концы: ${facts.ends.join(' и ')}. Совместимых камней у автора: ${facts.actorCompatible}.`));
   details.append(element('p', '', `Новые значения в цепочке: ${facts.freshSuits.length ? facts.freshSuits.join(', ') : 'нет'}. Новизна относится к истории, а не к опасности хода.`));
-  details.append(renderSuitProfile(facts.profile));
+  details.append(renderSuitProfile(facts.profile, context));
   if (facts.terminal) details.append(element('p', '', 'Раунд завершён. Следующего хода нет.'));
   else {
-    details.append(element('p', '', `${analysis.players[facts.next.player].name}: ${facts.next.forcedPass ? 'обязательный пас' : `допустимых выкладок — ${facts.next.choices}`}.`));
+    details.append(element('p', '', `${context.players[facts.next.player].name}: ${facts.next.forcedPass ? 'обязательный пас' : `допустимых выкладок — ${facts.next.choices}`}.`));
     const p = facts.partner;
-    details.append(element('p', '', `Партнёр ${analysis.players[p.player].name}: сейчас совместимых камней ${p.compatible}; после ответа соперника может выложить в ${p.replies} из ${p.branches} ветвей; раунд завершится до его очереди в ${p.ended} ветвях.`));
+    details.append(element('p', '', `Партнёр ${context.players[p.player].name}: сейчас совместимых камней ${p.compatible}; после ответа соперника может выложить в ${p.replies} из ${p.branches} ветвей; раунд завершится до его очереди в ${p.ended} ветвях.`));
   }
   details.append(element('p', 'muted', 'Факты проверены с раскрытыми руками. Это не разложение влияния или потери на бонусы и не прогноз выбора игроков.'));
   return details;
 }
-function renderSuitProfile(profile) {
+function renderSuitProfile(profile, context = analysis) {
   const details = element('details', 'candidate-facts');
   details.append(element('summary', '', 'Масти и контроль концов'));
   details.append(element('p', 'muted', 'Раскрытые руки. В ячейках: камни / половинки. Дубль — один камень и две половинки. Контроль означает текущее владение, а не гарантированный ход.'));
@@ -85,12 +87,12 @@ function renderSuitProfile(profile) {
   if (!profile.ends.length) details.append(element('p', '', 'Заход ещё не сделан, открытых концов нет.'));
   profile.ends.forEach((end, i) => {
     const owner = end.kind === 'closed' ? 'закрыт, ответов нет' : end.kind === 'player'
-      ? `исключительный контроль игрока ${analysis.players[end.players[0]].name}`
-      : end.kind === 'team' ? `исключительный контроль команды ${analysis.teams[end.team]}` : 'совместное владение команд';
-    details.append(element('p', '', `${i ? 'Правый' : 'Левый'} конец ${end.value}: ${owner}. Камни есть у: ${end.players.map(p => analysis.players[p].name).join(', ') || 'никого'}.`));
+      ? `исключительный контроль игрока ${context.players[end.players[0]].name}`
+      : end.kind === 'team' ? `исключительный контроль команды ${context.teams[end.team]}` : 'совместное владение команд';
+    details.append(element('p', '', `${i ? 'Правый' : 'Левый'} конец ${end.value}: ${owner}. Камни есть у: ${end.players.map(p => context.players[p].name).join(', ') || 'никого'}.`));
   });
   const wrap = element('div', 'history-scroll'), table = element('table'), head = element('tr');
-  for (const label of ['Масть', 'Осталось', 'Сыграно', ...analysis.players.map(p => p.name), ...analysis.teams.slice(0, 2)]) head.append(element('th', '', label));
+  for (const label of ['Масть', 'Осталось', 'Сыграно', ...context.players.map(p => p.name), ...context.teams.slice(0, 2)]) head.append(element('th', '', label));
   const thead = element('thead'); thead.append(head); table.append(thead);
   const body = element('tbody');
   for (const suit of profile.suits) {
@@ -101,25 +103,25 @@ function renderSuitProfile(profile) {
   }
   table.append(body); wrap.append(table); details.append(wrap); return details;
 }
-function renderTerminalDecision(decision) {
+function renderTerminalDecision(decision, context = analysis) {
   const { before, outcome: o } = decision;
   const reason = { emptyHand: 'Выход', fish: 'Рыба', eggs: 'Рыба с яйцами' }[o.reason];
-  const name = team => team === null ? 'не назначен' : team === 2 ? 'Ничья партии' : analysis.teams[team];
+  const name = team => team === null ? 'не назначен' : team === 2 ? 'Ничья партии' : context.teams[team];
   const details = element('details', 'candidate-facts settlement-review');
   details.append(element('summary', '', `Завершение раунда: ${reason}`));
-  details.append(element('p', '', `Завершил: ${analysis.players[o.finishedPlayer].name}. Победитель по правилам: ${name(o.winnerTeam)}. Аналитический победитель: ${name(o.analyticsWinner)}.`));
-  for (let t = 0; t < 2; t++) details.append(element('p', '', `${analysis.teams[t]}: остаток ${o.residual[t]}; начислено за раунд ${o.roundScore[t]}; забор ${before.fence[t]} → ${o.fence[t]}; счёт ${before.score[t]} → ${o.totalScore[t]}.`));
+  details.append(element('p', '', `Завершил: ${context.players[o.finishedPlayer].name}. Победитель по правилам: ${name(o.winnerTeam)}. Аналитический победитель: ${name(o.analyticsWinner)}.`));
+  for (let t = 0; t < 2; t++) details.append(element('p', '', `${context.teams[t]}: остаток ${o.residual[t]}; начислено за раунд ${o.roundScore[t]}; забор ${before.fence[t]} → ${o.fence[t]}; счёт ${before.score[t]} → ${o.totalScore[t]}.`));
   details.append(element('p', '', `Банк яиц: ${before.eggs} → ${o.eggs}. ${o.gameWinner === null ? 'Партия продолжается.' : `Партия завершена: ${name(o.gameWinner)}.`}`));
   if (o.reason !== 'emptyHand') details.append(element('p', 'muted', o.gameWinner === null
     ? 'Партия не завершена: аналитический исход рыбы относится к команде рыбака. Дубль не меняет рыбака.'
     : 'Партия завершена: аналитический исход рыбы определяется итогом партии, включая ничью, независимо от команды рыбака.'));
   return details;
 }
-function renderOutcomeComposition(result, title) {
+function renderOutcomeComposition(result, title, context = analysis) {
   const details = element('details', 'candidate-facts composition');
   details.append(element('summary', '', title));
   const wrap = element('div', 'history-scroll'), table = element('table'), header = element('tr');
-  for (const label of ['Завершение', ...analysis.teams.slice(0, 2), 'Ничья партии', 'Всего']) header.append(element('th', '', label));
+  for (const label of ['Завершение', ...context.teams.slice(0, 2), 'Ничья партии', 'Всего']) header.append(element('th', '', label));
   const thead = element('thead'); thead.append(header); table.append(thead);
   const body = element('tbody'), denominator = BigInt(result.leaves);
   for (const [reason, label] of [['emptyHand', 'Выход'], ['fish', 'Рыба'], ['eggs', 'Яйца']]) {
@@ -152,13 +154,12 @@ function domino(stone, layout) {
 }
 
 
-function chainTiles(stones) {
-  const teams = chainTeams(stones, analysis.steps[0].hands);
+function chainTiles(stones, context = analysis, teams = chainTeams(stones, context.steps[0].hands)) {
   return stones.map((stone, i) => {
     const tile = domino(stone, 'chain'), team = teams[i];
     tile.classList.add(`tile-team-${team}`);
-    tile.title = `${stone} · ${analysis.teams[team]}`;
-    tile.setAttribute('aria-label', `${stone.replace('-', '–')} · ${analysis.teams[team]}`);
+    tile.title = `${stone} · ${context.teams[team]}`;
+    tile.setAttribute('aria-label', `${stone.replace('-', '–')} · ${context.teams[team]}`);
     return tile;
   });
 }
@@ -321,6 +322,99 @@ function renderQualitySummary() {
       $('quality-body').append(row);
     });
   }
+}
+
+async function openTactics() {
+  if (busy) { showMessage('Сначала остановите текущий расчёт.'); return; }
+  try {
+    if (!tacticsCatalog.length) {
+      tacticsCatalog = (await api('/api/lessons')).lessons;
+      $('tactics-select').replaceChildren(...tacticsCatalog.map(l => {
+        const option = element('option', '', l.title); option.value = l.id; return option;
+      }));
+    }
+    tactics = { result: null, running: false, status: '', grade: null };
+    tacticsAttempts = [];
+    document.body.classList.add('tactics-active'); $('tactics-panel').hidden = false;
+    $('tactics-title').focus(); loadTactic();
+  } catch (e) { showMessage(e.message, true); }
+}
+function loadTactic() {
+  if (!tactics || tactics.running) return;
+  const session = tactics, id = $('tactics-select').value, mirror = $('tactics-mirror').checked;
+  session.running = true; session.stop = false; session.status = 'Точный расчёт упражнения…'; renderTactic();
+  session.pending = (async () => {
+    try {
+      let job = await api('/api/lesson', { id, mirror }); session.job = job.id;
+      if (session.stop && job.status === 'running') job = await api('/api/jobs/' + job.id, undefined, 'DELETE');
+      while (job.status === 'running') {
+        session.status = `Расчёт: ${nf.format(job.stats.nodes)} позиций · Кеш ≈ ${formatCacheSize(job.stats.cacheBytesEstimate)}`;
+        $('tactics-status').textContent = session.status;
+        await new Promise(r => setTimeout(r, 100)); job = await api('/api/jobs/' + job.id);
+      }
+      if (job.status === 'done' && !session.stop) {
+        session.result = job.result; session.grade = null; session.choice = null; session.id = ++tacticsSequence;
+        session.status = job.cached ? 'Готово, результат из кеша.' : 'Точный расчёт завершён.';
+      } else if (job.status === 'error') throw new Error(job.error);
+      else session.status = 'Расчёт отменён. Можно повторить или выбрать другое упражнение.';
+    } catch (e) { session.status = e.message; }
+    finally { session.running = false; session.job = null; if (tactics === session) renderTactic(); }
+  })();
+}
+async function cancelTactic() {
+  if (!tactics?.running) return;
+  tactics.stop = true;
+  if (tactics.job) await api('/api/jobs/' + tactics.job, undefined, 'DELETE');
+}
+function renderTactic() {
+  const session = tactics, result = session.result;
+  $('tactics-status').textContent = session.status;
+  for (const id of ['tactics-select', 'tactics-mirror', 'tactics-retry', 'tactics-next']) $(id).disabled = session.running;
+  $('tactics-cancel').disabled = !session.running;
+  $('tactics-board').replaceChildren(); $('tactics-choices').replaceChildren(); $('tactics-feedback').textContent = '';
+  $('tactics-context').textContent = result ? `${result.lesson.title}. ${result.lesson.contextNote}${result.lesson.mirror ? ' Отображение зеркальное.' : ''}` : '';
+  if (result) {
+    const step = result.steps[0], question = trainingQuestion(step), chain = element('div', 'chain');
+    chain.append(...(result.lesson.owners ? chainTiles(question.chain, result, result.lesson.owners) : question.chain.map(s => domino(s, 'chain'))));
+    $('tactics-board').append(chain, element('p', 'muted', `Ходит: ${result.players[question.turn].name} · открытые концы: ${question.ends.join(' и ')}`));
+    const hands = element('div', 'hands');
+    question.hands.forEach((stones, i) => {
+      const card = element('div', `hand ${i % 2 ? 'team-b' : ''} ${i === question.turn ? 'active' : ''}`), tiles = element('div', 'hand-stones');
+      tiles.append(...stones.map(s => domino(s, 'hand')));
+      card.append(element('div', 'hand-name', result.players[i].name), tiles); hands.append(card);
+    });
+    $('tactics-board').append(hands);
+    question.choices.forEach((choice, i) => {
+      const card = element('div', 'alternative'), button = element('button', 'button secondary training-choice');
+      if (choice.stone) button.append(domino(choice.stone)); button.append(document.createTextNode(actionText(choice)));
+      button.setAttribute('aria-label', actionText(choice));
+      button.disabled = session.running || !!session.grade;
+      button.addEventListener('click', () => {
+        if (session.grade || session.running) return;
+        session.choice = i; session.grade = gradeTrainingChoice(step, choice);
+        tacticsAttempts.push({ id: session.id, ...session.grade }); renderTactic();
+      });
+      card.append(button);
+      if (session.grade) {
+        const a = step.alternatives[i], grade = gradeTrainingChoice(step, choice);
+        if (grade.best) card.append(element('span', 'best-marker', 'Лучший по анализатору'));
+        if (session.choice === i) card.append(element('strong', '', 'Ваш ответ'));
+        if (motifApplies(step, a, result.lesson.motif)) card.append(element('p', 'muted', 'Ход с изучаемым мотивом'));
+        card.append(element('p', '', `W/N: ${a.wins[step.turn % 2]} / ${a.leaves} · ${percent(a.probabilities[step.turn % 2], a.wins[step.turn % 2], a.leaves)} · Потеря: ${formatPointDifference(grade.loss)}`));
+        card.append(renderMoveFacts(a.facts, step.turn, result));
+        if (a.settlement) card.append(renderTerminalDecision(a.settlement, result));
+        card.append(renderOutcomeComposition(a, 'Состав исходов хода', result));
+      }
+      $('tactics-choices').append(card);
+    });
+    if (session.grade) {
+      const kind = result.lesson.kind === 'confirmation' ? 'Подтверждающий пример' : 'Исключение';
+      const maxima = decisionQuality(step).entries.filter(e => e.best).map(e => actionText(e.alternative)).join(', ');
+      $('tactics-feedback').textContent = `${session.grade.best ? 'Ответ засчитан: точный максимум.' : 'Есть вариант с большей точной долей.'} ${kind}. ${result.lesson.explanation} Точные максимумы: ${maxima}. Упущенная возможность по анализатору: ${formatPointDifference(session.grade.loss)}.`;
+    }
+  }
+  const p = trainingProgress(tacticsAttempts);
+  $('tactics-progress').textContent = `Ответов: ${p.attempts} · Лучших из значимых: ${p.best} из ${p.decisions} · Доля: ${p.bestShare ? formatPointDifference(p.bestShare) : '—'} · Средняя потеря: ${p.averageLoss ? formatPointDifference(p.averageLoss) : '—'}`;
 }
 
 function openTraining(position = stepIndex) {
@@ -746,6 +840,22 @@ $('examples').addEventListener('change', async () => {
 });
 $('demo').addEventListener('click', () => importSource(() => api('/api/example', { name: 'demo' }), 'Учебная партия · 3 раунда'));
 $('analyze-game').addEventListener('click', analyzeGame);
+$('open-tactics').addEventListener('click', openTactics);
+for (const id of ['tactics-select', 'tactics-mirror']) $(id).addEventListener('change', loadTactic);
+$('tactics-retry').addEventListener('click', loadTactic);
+$('tactics-next').addEventListener('click', () => {
+  const current = tacticsCatalog.findIndex(l => l.id === $('tactics-select').value);
+  $('tactics-select').value = tacticsCatalog[(current + 1) % tacticsCatalog.length].id; loadTactic();
+});
+$('tactics-cancel').addEventListener('click', () => cancelTactic().catch(e => { $('tactics-status').textContent = e.message; }));
+$('tactics-exit').addEventListener('click', async () => {
+  const session = tactics;
+  try { await cancelTactic(); await session.pending; }
+  finally {
+    tactics = null; document.body.classList.remove('tactics-active'); $('tactics-panel').hidden = true;
+    $('open-tactics').focus();
+  }
+});
 $('explore-current').addEventListener('click', () => openBranch());
 $('branch-cancel').addEventListener('click', () => cancelBranch().catch(e => { $('branch-status').textContent = e.message; }));
 $('branch-reset').addEventListener('click', () => requestBranch([]));
@@ -786,11 +896,12 @@ for (const suffix of navigationSuffixes) {
   $(`next${suffix}`).addEventListener('click', () => selectStep(stepIndex + 1));
 }
 document.addEventListener('keydown', event => {
-  if (training || branch) return;
+  if (training || branch || tactics) return;
   if (['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(event.target.tagName)) return;
   if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); selectStep(stepIndex + (event.key === 'ArrowRight' ? 1 : -1)); }
 });
 $('welcome-tiles').replaceChildren(...['1-1', '1-6', '6-3'].map(stone => domino(stone, 'hand')));
+$('figure5-hand').replaceChildren(...['1-2', '1-3', '1-4', '1-5', '0-0', '0-6', '6-6'].map(s => domino(s, 'hand')));
 try {
   const { files } = await api('/api/examples');
   for (const file of files) { const option = element('option', '', file); option.value = file; $('examples').append(option); }
