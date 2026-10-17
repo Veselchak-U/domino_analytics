@@ -25,6 +25,30 @@ export function rankAlternatives(step) {
   });
 }
 
+/** Exact probability difference before conversion to percent or display rounding.
+ * @returns {{numerator: bigint, denominator: bigint}} A fraction of one, not percent.
+ */
+export function probabilityDifference(left, right, team) {
+  return { numerator: BigInt(left.wins[team]) * BigInt(right.leaves) - BigInt(right.wins[team]) * BigInt(left.leaves),
+    denominator: BigInt(left.leaves) * BigInt(right.leaves) };
+}
+
+/** Classify the next decision using the actor's exact W/N; preserve every unique action.
+ * @returns {{kind: 'terminal'|'forced'|'equivalent'|'choice', bestCount: number,
+ * entries: Array<{alternative: object, best: boolean, loss: {numerator: bigint, denominator: bigint}}>, actual: object|null}}
+ */
+export function decisionQuality(step) {
+  const ranked = rankAlternatives(step);
+  const entries = ranked.map(alternative => {
+    const loss = probabilityDifference(ranked[0], alternative, step.turn % 2);
+    return { alternative, best: loss.numerator === 0n, loss };
+  });
+  const bestCount = entries.filter(entry => entry.best).length;
+  const kind = !entries.length ? 'terminal' : entries.length === 1 ? 'forced'
+    : bestCount === entries.length ? 'equivalent' : 'choice';
+  return { kind, bestCount, entries, actual: entries.find(entry => entry.alternative.actual) ?? null };
+}
+
 /** Independent maxima from the position before each recorded action. */
 export function bestOptionsAtSteps(steps, players) {
   return optionsAtSteps(steps, players, false);

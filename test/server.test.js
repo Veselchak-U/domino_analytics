@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createApp } from '../src/server.js';
+import { decisionQuality } from '../public/impact.js';
 
 test('локальный HTTP: проверка, worker, отмена, повтор, кеш и восстановление после ошибки', { timeout: 120000 }, async () => {
   const app = createApp({ examplesDir: new URL('./fixtures', import.meta.url).pathname });
@@ -61,6 +62,14 @@ test('локальный HTTP: проверка, worker, отмена, повт�
       assert.equal(step.wins.reduce((n, s) => n + BigInt(s), 0n), BigInt(step.leaves));
       if (!step.terminal) assert.equal(step.alternatives.filter(a => a.actual).length, 1);
       if (!step.terminal) {
+        const quality = decisionQuality(step);
+        assert.equal(quality.entries.length, step.alternatives.length);
+        assert.ok(quality.actual);
+        assert.ok(quality.entries.every(entry => entry.loss.numerator >= 0n));
+        assert.equal(quality.bestCount, quality.entries.filter(entry => entry.loss.numerator === 0n).length);
+        const next = result.steps[step.index + 1];
+        assert.deepEqual(quality.actual.alternative.wins, next.wins);
+        assert.equal(quality.actual.alternative.leaves, next.leaves);
         assert.equal(BigInt(step.leaves), step.alternatives.reduce((sum, a) => sum + BigInt(a.leaves), 0n));
         for (let team = 0; team < 3; team++) {
           assert.equal(BigInt(step.wins[team]), step.alternatives.reduce((sum, a) => sum + BigInt(a.wins[team]), 0n));

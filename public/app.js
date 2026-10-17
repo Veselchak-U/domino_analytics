@@ -1,5 +1,5 @@
-import { aggregateImpacts, alternativeImpact, rankAlternatives, comparisonChance } from './impact.js';
-import { formatCacheSize } from './format.js';
+import { aggregateImpacts, alternativeImpact, comparisonChance, decisionQuality } from './impact.js';
+import { formatCacheSize, formatPointDifference } from './format.js';
 import { revealChartStep } from './navigation.js';
 const $ = id => document.getElementById(id);
 const colors = ['var(--a)', 'var(--b)', 'var(--draw)'];
@@ -8,7 +8,7 @@ const classes = ['a', 'b', 'draw'];
 const nf = new Intl.NumberFormat('ru-RU');
 const navigationSuffixes = ['', '-history'];
 let game = null, analysis = null, stepIndex = 0, activeJob = null, busy = false;
-let roundAnalyses = new Map(), stopQueue = false;
+let roundAnalyses = new Map(), stopQueue = false, selectedRound = 1;
 let backgroundCalculation = false;
 let chartWidth = 960;
 const chartInsets = { left: 120, right: 40 };
@@ -26,7 +26,7 @@ function showMessage(text, error = false) {
 }
 function setBusy(value) {
   busy = value;
-  for (const id of ['file', 'examples', 'demo', 'round', 'analyze']) $(id).disabled = value;
+  for (const id of ['file', 'examples', 'demo']) $(id).disabled = value;
   for (const button of $('round-list').children) button.disabled = value;
   $('analyze-game').disabled = value;
   updateRoundButtons();
@@ -85,12 +85,10 @@ async function importSource(request, name) {
     const variant = `Козёл, 2x2, до ${game.scoreLimit} ${game.scoreLimit === 101 ? 'очка' : 'очков'}, ${game.fishVariant === 'withEggs' ? 'с яйцами' : 'без яиц'}`;
     $('rules-label').textContent = variant;
     $('game-variant').textContent = `Вариант игры: ${variant}`;
-    $('round').replaceChildren(); $('round-list').replaceChildren();
+    selectedRound = game.rounds[0].number; $('round-list').replaceChildren();
     for (const round of game.rounds) {
-      const option = element('option', '', `Раунд ${round.number} · ${round.moves} действий`);
-      option.value = round.number; $('round').append(option);
       const button = element('button', 'round-chip', `Раунд ${round.number}  ·  ${round.score.join(' : ')}`);
-      button.addEventListener('click', () => { $('round').value = round.number; startAnalysis(); });
+      button.addEventListener('click', () => selectRound(round.number));
       $('round-list').append(button);
     }
     showMessage(''); setBusy(false);
@@ -105,7 +103,7 @@ async function startAnalysis() {
   setBusy(true); showMessage(''); $('welcome').hidden = true; $('progress').hidden = false;
   $('dashboard').hidden = true; $('cancel').disabled = false;
   $('progress-text').textContent = 'Подготовка расчёта…';
-  const round = Number($('round').value);
+  const round = selectedRound;
   markSelectedRound(round);
   try {
     const job = await requestRound(round);
@@ -157,7 +155,7 @@ async function analyzeGame() {
 }
 
 function markSelectedRound(number) {
-  $('round').value = number;
+  selectedRound = number;
   [...$('round-list').children].forEach((node, i) => node.classList.toggle('active', i === number - 1));
 }
 
@@ -302,19 +300,30 @@ function renderStep() {
     $('outcome').replaceChildren(element('strong', '', `${reason}. ${winner}.`), element('div', '', `Счёт после раунда: ${o.totalScore.join(' : ')}. ${o.gameWinner === null ? 'Партия продолжается.' : 'Партия завершена.'}`),
       element('div', 'muted', `Победитель раунда по исходным правилам: ${o.winnerTeam === null ? 'не назначается' : analysis.teams[o.winnerTeam]}. Завершил: ${analysis.players[o.finishedPlayer].name}.`));
   }
+  const quality = decisionQuality(step);
+  const choiceLabels = { forced: 'Вынужденный ход', equivalent: 'Равноценный выбор', choice: 'Разные оценки' };
+  $('choice-status').textContent = quality.kind === 'terminal' ? 'Раунд завершён'
+    : `${choiceLabels[quality.kind]} · Лучших вариантов: ${quality.bestCount} из ${quality.entries.length}`;
+  $('recorded-choice').hidden = !quality.actual;
+  if (quality.actual) {
+    const { alternative, loss } = quality.actual;
+    $('recorded-choice').textContent = `В игре: ${actionText(alternative)} · Влияние ${signed(alternativeImpact(step, alternative))} % · Упущенная возможность по анализатору: ${formatPointDifference(loss)}`;
+  }
   $('alternatives').replaceChildren();
-  for (const alternative of rankAlternatives(step)) {
-    const card = element('div', 'alternative'), head = element('div', 'alternative-head');
+  for (const { alternative, best, loss } of quality.entries) {
+    const card = element('div', `alternative${alternative.actual ? ' actual-alternative' : ''}`), head = element('div', 'alternative-head');
     if (alternative.stone) head.append(domino(alternative.stone));
     head.append(element('span', '', actionText(alternative)));
     const impact = alternativeImpact(step, alternative);
     head.append(element('span', `alternative-impact ${impact > 0 ? 'positive' : impact < 0 ? 'negative' : ''}`, `Влияние ${signed(impact)} %`));
+    if (best) head.append(element('span', 'best-marker', quality.bestCount > 1 ? 'Один из лучших' : 'Лучший'));
     if (alternative.actual) head.append(element('span', 'actual', 'В игре'));
     const chances = element('div', 'alt-chances');
     for (let t = 0; t < 2; t++) chances.append(element('span', classes[t], percent(alternative.probabilities[t], alternative.wins[t], alternative.leaves)));
     const bar = element('div', 'chance-bar');
     for (let t = 0; t < 3; t++) { const segment = element('span', `bg-${classes[t]}`); segment.style.width = `${alternative.probabilities[t]}%`; bar.append(segment); }
-    card.append(head, chances, bar, element('div', 'alt-leaves', `${nf.format(BigInt(alternative.leaves))} исходов · ничья ${percent(alternative.probabilities[2], alternative.wins[2], alternative.leaves)}`));
+    card.append(head, element('div', `opportunity-loss ${loss.numerator > 0n ? 'negative' : ''}`, `Потеря к лучшему: ${formatPointDifference(loss)}`),
+      chances, bar, element('div', 'alt-leaves', `${nf.format(BigInt(alternative.leaves))} исходов · ничья ${percent(alternative.probabilities[2], alternative.wins[2], alternative.leaves)}`));
     $('alternatives').append(card);
   }
   if (!step.alternatives.length) $('alternatives').append(element('p', 'muted', 'Дальнейших ходов нет. Раунд завершён.'));
@@ -388,7 +397,7 @@ function renderImpactChart() {
   const y = v => 118 - v / max * 82;
   for (const value of [-max, 0, max]) {
     chart.append(svgNode('line', { x1: chartInsets.left, x2: chartWidth - chartInsets.right, y1: y(value), y2: y(value), stroke: value === 0 ? 'var(--axis)' : 'var(--line)', 'stroke-dasharray': value === 0 ? 'none' : '3 5' }),
-      svgNode('text', { x: 65, y: y(value) + 5, 'text-anchor': 'end', fill: 'var(--muted)', 'font-size': 13 }, `${signed(value)}%`));
+      svgNode('text', { x: 105, y: y(value) + 5, 'text-anchor': 'end', fill: 'var(--muted)', 'font-size': 13 }, `${signed(value)} %`));
   }
   chart.append(svgNode('text', { x: 65, y: 235, 'text-anchor': 'end', fill: 'var(--muted)', 'font-size': 12 }, 'Лучший'));
   chart.append(svgNode('text', { x: 65, y: 256, 'text-anchor': 'end', fill: 'var(--muted)', 'font-size': 12 }, 'Факт'));
@@ -418,7 +427,12 @@ function renderImpactChart() {
   const best = analysis.steps[stepIndex].best.impact;
   const worst = analysis.steps[stepIndex].worst.impact;
   $('impact-selection').style.color = current ? colors[current.player % 2] : 'var(--muted)';
-  $('impact-selection').textContent = current ? `Ход ${stepIndex} · P${current.player + 1} ${analysis.players[current.player].name} · лучший ${signed(best.value)} % (${actionText(best.move)}) · факт ${signed(current.value)} % · худший ${signed(worst.value)} % (${actionText(worst.move)})` : 'До первого хода · влияние 0,00 %';
+  const quality = stepIndex ? decisionQuality(analysis.steps[stepIndex - 1]) : null;
+  const bestLabel = quality?.bestCount > 1 ? 'один из лучших' : 'лучший';
+  $('impact-selection').textContent = current ? `Ход ${stepIndex} · P${current.player + 1} ${analysis.players[current.player].name} · ${bestLabel} ${signed(best.value)} % (${actionText(best.move)}) · факт ${signed(current.value)} % · худший ${signed(worst.value)} % (${actionText(worst.move)})` : 'До первого хода · влияние 0,00 %';
+  $('decision-loss').textContent = current && quality.actual
+    ? `Ход ${stepIndex} · ${analysis.players[current.player].name} · Влияние ${signed(current.value)} % · Упущенная возможность по анализатору: ${formatPointDifference(quality.actual.loss)}`
+    : 'До первого хода · предыдущее решение отсутствует';
 }
 for (const id of ['chart', 'impact-chart']) $(id).addEventListener('click', event => {
   if (!analysis) return;
@@ -438,8 +452,6 @@ $('examples').addEventListener('change', async () => {
   $('examples').value = '';
 });
 $('demo').addEventListener('click', () => importSource(() => api('/api/example', { name: 'demo' }), 'Учебная партия · 3 раунда'));
-$('round').addEventListener('change', startAnalysis);
-$('analyze').addEventListener('click', startAnalysis);
 $('analyze-game').addEventListener('click', analyzeGame);
 $('cancel').addEventListener('click', async () => {
   stopQueue = true;

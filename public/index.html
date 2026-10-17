@@ -21,9 +21,7 @@
     <div id="game-meta" class="game-meta" hidden>
       <p><span class="variant-label">Партия:</span><span id="source-name" class="source-name"></span></p>
       <p><span class="variant-label">Вариант игры:</span><span id="rules-label"></span></p>
-      <label for="round" class="side-heading">РАУНД</label>
-      <select id="round"></select>
-      <button id="analyze" class="side-button">Рассчитать выбранный раунд →</button>
+      <div class="side-heading">РАУНД</div>
       <div id="round-list" class="round-list"></div>
     </div>
   </aside>
@@ -58,13 +56,14 @@
           <div class="chart-wrap"><svg id="chart" viewBox="0 0 960 240" role="img" aria-label="График вероятностей победы по ходам"></svg></div>
           <p id="best-chances" class="muted" aria-live="polite"></p>
           <p id="worst-chances" class="muted" aria-live="polite"></p>
-          <h3 class="impact-heading">Влияние хода</h3>
+          <h3 class="impact-heading">Влияние хода, %</h3>
           <div id="player-legend" class="legend"></div>
           <div class="legend move-comparison-legend"><span class="legend-item"><i class="move-swatch best-swatch"></i>Лучший допустимый ход</span><span class="legend-item"><i class="move-swatch actual-swatch"></i>Сделанный ход</span><span class="legend-item"><i class="move-swatch worst-swatch"></i>Худший вероятный ход</span></div>
-          <p id="impact-selection" class="muted" aria-live="polite">До первого хода · импакт 0,00 %</p>
+          <p id="impact-selection" class="muted" aria-live="polite">До первого хода · влияние 0,00 %</p>
           <div class="chart-wrap"><svg id="impact-chart" viewBox="0 0 960 365" role="img" aria-label="Влияние хода: лучший, сделанный и худший вероятный"></svg></div>
           <div class="chart-caption"><span>До первого хода</span><span>Ходы →</span><span>Конец раунда</span></div>
         </div></div>
+        <p id="decision-loss" class="decision-review muted" aria-live="polite">До первого хода · предыдущее решение отсутствует</p>
       </section>
       <section class="navigator panel" aria-label="Навигация по истории">
         <div class="step-description"><span id="step-count" class="eyebrow">ПОЗИЦИЯ 0</span><strong id="move-title">До первого хода</strong></div>
@@ -73,7 +72,7 @@
       </section>
       <div class="detail-grid">
         <section class="panel table-panel"><div class="section-top"><h2>Позиция на столе</h2><span id="turn-label" class="muted"></span></div><div id="chain" class="chain"></div><div id="ends" class="ends"></div><div id="hands" class="hands"></div><div id="outcome" class="outcome" hidden></div></section>
-        <section class="panel alternatives-panel"><div class="section-top"><h2>Возможные ходы</h2></div><p class="muted">Шансы после каждого допустимого действия. Влияние — изменение шанса команды ходящего игрока. Метка «В игре» обозначает реальный выбор.</p><div id="alternatives"></div></section>
+        <section class="panel alternatives-panel"><div class="section-top"><h2>Возможные ходы</h2></div><p id="choice-status" class="choice-status" aria-live="polite"></p><p id="recorded-choice" class="decision-review muted" hidden></p><div id="alternatives"></div><p class="muted">Раскрытые руки. Влияние — изменение шанса команды ходящего; потеря — разница до лучшего варианта. Разности обозначены знаком %. Все точные максимумы отмечены, «В игре» — реальный выбор.</p></section>
       </div>
       <section class="navigator panel" aria-label="Навигация перед историей раунда">
         <div class="step-description"><span id="step-count-history" class="eyebrow">ПОЗИЦИЯ 0</span><strong id="move-title-history">До первого хода</strong></div>
@@ -83,10 +82,12 @@
       <section class="panel history-panel"><div class="section-top"><h2>История раунда</h2><span class="muted">Нажмите на строку, чтобы перейти к ходу</span></div><div class="history-scroll"><table><thead><tr><th>Шаг</th><th>Игрок / действие</th><th id="history-team-a">Команда A</th><th id="history-team-b">Команда B</th><th>Изменение A</th><th>Ничья партии</th></tr></thead><tbody id="history"></tbody></table></div></section>
       <section id="faq" class="panel explanation" aria-labelledby="faq-title"><h2 id="faq-title">FAQ</h2>
         <details class="faq-item"><summary>Как устроен расчёт и что означает победа при рыбе</summary><p>Одинаковые дочерние позиции объединяются. Зеркальные цепочки с одинаковыми руками, открытыми концами, очередью и рыбаком эквивалентны. Разные последовательности, позднее пришедшие к одинаковой позиции, сохраняют кратность конечных ветвей.</p><p>При рыбе, завершающей партию, побеждает победитель партии; окончательная ничья считается отдельно. При продолжающейся партии побеждает команда рыбака — последнего игрока, выложившего недубль. Это относится и к рыбе с яйцами. Начисления очков и исходный результат журнала проверяются по исходной спецификации.</p><p>Шаг 0 включает все допустимые заходы назначенного игрока. При первом раунде и счёте 0:0 заход обязателен с 1–1. Числа исходов точные, проценты округлены только для отображения.</p></details>
-        <details class="faq-item"><summary>Как рассчитывается вероятность победы?</summary><p>Вероятность = выигрышные конечные ветви / все конечные ветви. Все ветви равновероятны. Это модель исходов раздачи, без предположения об оптимальной игре.</p></details>
+        <details class="faq-item"><summary>Как рассчитывается вероятность победы?</summary><p>Вероятность = выигрышные конечные ветви / все конечные ветви. Все конечные ветви имеют одинаковый вес. Ход с большим числом продолжений имеет больший вес в исходной оценке: это не равновероятный выбор действий, не minimax и не прогноз поведения людей.</p><p>Анализ использует раскрытые руки всех игроков. Человек не видел чужих камней, поэтому упущенная возможность по анализатору не доказывает ошибку человека.</p></details>
         <details class="faq-item"><summary>Что показывают пунктирные линии лучших ходов?</summary><p>После хода своей команды пунктир показывает её лучший доступный шанс из позиции перед этим ходом. После хода соперника пунктир совпадает с фактической вероятностью команды после хода. Это сравнение вариантов из реальных позиций, а не отдельный идеальный розыгрыш.</p></details>
         <details class="faq-item"><summary>Что показывают точечные линии худших ходов?</summary><p>После хода своей команды линия из точек показывает её худший доступный шанс из позиции перед этим ходом. После хода соперника она совпадает с фактической вероятностью команды: все три её линии в этой точке совпадают. Это не отдельный розыгрыш самых плохих ходов.</p></details>
-        <details class="faq-item"><summary>Как считается импакт хода?</summary><p>Импакт = шанс своей команды после хода − до хода. Плюс — улучшение, минус — ухудшение. Разница 50% → 60% обозначается +10%; это не относительный прирост.</p></details>
+        <details class="faq-item"><summary>Как считается импакт хода?</summary><p>Влияние (импакт) Δ = шанс своей команды после хода − до хода. Плюс — улучшение, минус — ухудшение. Разница 50% → 60% обозначается +10 %; это не относительный прирост. Вероятности остаются в %. Суммы влияния игрока также измеряются в %; они могут превышать 100 и не являются потерянной вероятностью победы в партии.</p></details>
+        <details class="faq-item"><summary>Что такое упущенная возможность по анализатору?</summary><p>Потеря L = лучший доступный шанс − шанс после выбранного хода для команды автора из той же позиции. Она неотрицательна. Положительное влияние не исключает потери: ход мог улучшить оценку, но уступить другому варианту. Для каждого кандидата показана «Потеря к лучшему».</p><p>Потеря вычисляется из точных W/N до округления и показывается до сотых % Ненулевая потеря меньше 0,01 % обозначается «&lt;0,01 %», точный ноль — «0,00 %». Сумма локальных потерь, если она рассматривается, не равна потерянной вероятности победы в партии и может превышать 100 %</p></details>
+        <details class="faq-item"><summary>Как различаются вынужденный ход и равноценный выбор?</summary><p>Вынужденный ход — единственное уникальное допустимое действие, включая обязательный пас. Равноценный выбор — несколько действий с точно одинаковой долей побед своей команды. В остальных позициях показан статус «Разные оценки».</p><p>Каждый точный максимум считается лучшим и имеет нулевую потерю, независимо от отметки «В игре». Совпадения округлённых процентов недостаточно для равенства. Под графиком может быть показан один из нескольких лучших ходов; полный набор доступен в позиции перед решением.</p></details>
       </section>
     </div>
   </main>
