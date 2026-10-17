@@ -315,7 +315,7 @@ function renderQualitySummary() {
   for (const [label, values] of [[`Раунд ${analysis.number}${current?.complete ? '' : ' (неполно)'}`, current?.players], ['Вся партия', summary.players]]) {
     game.players.forEach((player, i) => {
       const row = element('tr'), p = values?.[i];
-      row.append(element('td', '', player.name), element('td', '', label));
+      row.append(element('td', classes[i % 2], player.name), element('td', '', label));
       row.append(element('td', '', p ? `${p.best} из ${p.decisions}` : '—'));
       for (const key of ['bestShare', 'averageLoss', 'maxLoss']) row.append(element('td', '', p?.[key] ? formatPointDifference(p[key]) : '—'));
       for (const key of ['forced', 'equivalent', 'unavailable']) row.append(element('td', '', p ? p[key] : '—'));
