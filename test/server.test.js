@@ -98,6 +98,8 @@ test('локальный HTTP: проверка, worker, отмена, повт�
         assert.ok(quality.entries.every(entry => entry.loss.numerator >= 0n));
         assert.equal(quality.bestCount, quality.entries.filter(entry => entry.loss.numerator === 0n).length);
         const next = result.steps[step.index + 1];
+        assert.deepEqual(quality.actual.alternative.facts.after.map(h => h.count), next.hands.map(h => h.length));
+        assert.equal(quality.actual.alternative.facts.terminal, next.terminal);
         assert.deepEqual(quality.actual.alternative.wins, next.wins);
         assert.equal(quality.actual.alternative.leaves, next.leaves);
         assert.equal(BigInt(step.leaves), step.alternatives.reduce((sum, a) => sum + BigInt(a.leaves), 0n));

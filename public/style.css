@@ -73,3 +73,6 @@ main{min-width:0}.section-top{flex-wrap:wrap}table{font-variant-numeric:tabular-
 .episode-filter{display:flex;align-items:center;flex-wrap:wrap;gap:10px 14px;margin:18px 0}
 .episode-filter label{font-weight:600}.episode-filter input{width:95px;min-height:42px;padding:8px;font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--axis);border-radius:6px}
 .episode-filter input[aria-invalid="true"]{border-color:var(--negative)}.episode-filter .muted{flex:1 1 260px;line-height:1.6}
+.candidate-facts{margin-top:12px;border-top:1px solid var(--line);padding-top:10px;font-size:14px;line-height:1.6}.candidate-facts summary{cursor:pointer;font-weight:600}.candidate-facts p{margin:8px 0;overflow-wrap:anywhere}
+.episodes-heading{display:flex;align-items:baseline;flex-wrap:wrap;gap:10px 18px}.episodes-heading h2{margin:0}.episodes-header{gap:12px}.episodes-header .episode-filter{margin:0 0 0 auto}.episodes-header label{font-size:14px}
+@media(max-width:760px){.episodes-header .episode-filter{margin-left:0}}

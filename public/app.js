@@ -55,6 +55,21 @@ function actionText(move) {
   const action = { start: 'заход', left: 'слева', right: 'справа', pass: 'пропуск' }[move.action];
   return `${move.stone?.replace('-', '–') ?? ''} ${action}`.trim();
 }
+function renderMoveFacts(facts, actor) {
+  const details = element('details', 'candidate-facts');
+  details.append(element('summary', '', 'Факты после хода'));
+  const before = facts.before[actor], after = facts.after[actor];
+  details.append(element('p', '', `Рука автора: камней ${before.count} → ${after.count}; очков остатка ${before.points} → ${after.points}; дублей ${before.doubles} → ${after.doubles}; покрытых мастей ${before.coverage.length} → ${after.coverage.length}.`));
+  details.append(element('p', '', `Открытые концы: ${facts.ends.join(' и ')}. Совместимых камней у автора: ${facts.actorCompatible}.`));
+  if (facts.terminal) details.append(element('p', '', 'Раунд завершён. Следующего хода нет.'));
+  else {
+    details.append(element('p', '', `${analysis.players[facts.next.player].name}: ${facts.next.forcedPass ? 'обязательный пас' : `допустимых выкладок — ${facts.next.choices}`}.`));
+    const p = facts.partner;
+    details.append(element('p', '', `Партнёр ${analysis.players[p.player].name}: сейчас совместимых камней ${p.compatible}; после ответа соперника может выложить в ${p.replies} из ${p.branches} ветвей; раунд завершится до его очереди в ${p.ended} ветвях.`));
+  }
+  details.append(element('p', 'muted', 'Факты проверены с раскрытыми руками. Это не разложение влияния или потери на бонусы и не прогноз выбора игроков.'));
+  return details;
+}
 const pipLayout = [[], [[50, 50]], [[24, 24], [76, 76]], [[24, 24], [50, 50], [76, 76]],
   [[24, 24], [76, 24], [24, 76], [76, 76]],
   [[24, 24], [76, 24], [50, 50], [24, 76], [76, 76]],
@@ -381,6 +396,7 @@ function renderStep() {
     card.append(head);
     if (quality.kind !== 'forced') card.append(element('div', `opportunity-loss ${loss.numerator > 0n ? 'negative' : ''}`, `Потеря к лучшему: ${formatPointDifference(loss)}`));
     card.append(chances, bar, element('div', 'alt-leaves', `${nf.format(BigInt(alternative.leaves))} исходов · ничья ${percent(alternative.probabilities[2], alternative.wins[2], alternative.leaves)}`));
+    if (alternative.facts) card.append(renderMoveFacts(alternative.facts, step.turn));
     $('alternatives').append(card);
   }
   if (!step.alternatives.length) $('alternatives').append(element('p', 'muted', 'Дальнейших ходов нет. Раунд завершён.'));
