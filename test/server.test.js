@@ -23,6 +23,7 @@ test('локальный HTTP: проверка, worker, отмена, повт�
     assert.match(theme.headers.get('content-type'), /text\/javascript/);
     assert.equal((await fetch(base + '/impact.js')).status, 200);
     assert.equal((await fetch(base + '/quality.js')).status, 200);
+    assert.equal((await fetch(base + '/domino.js')).status, 200);
     assert.equal((await fetch(base + '/format.js')).status, 200);
     const navigation = await fetch(base + '/navigation.js');
     assert.equal(navigation.status, 200);

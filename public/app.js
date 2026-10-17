@@ -1,4 +1,5 @@
 import { keyEpisodes, summarizePlayerQuality } from './quality.js';
+import { chainTeams } from './domino.js';
 import { aggregateImpacts, alternativeImpact, comparisonChance, decisionQuality, decisionSpread } from './impact.js';
 import { formatCacheSize, formatPointDifference } from './format.js';
 import { revealChartStep } from './navigation.js';
@@ -135,13 +136,14 @@ const pipLayout = [[], [[50, 50]], [[24, 24], [76, 76]], [[24, 24], [50, 50], [7
   [[24, 24], [76, 24], [50, 50], [24, 76], [76, 76]],
   [[24, 24], [76, 24], [24, 50], [76, 50], [24, 76], [76, 76]]];
 const doubleSixLayout = [[24, 24], [50, 24], [76, 24], [24, 76], [50, 76], [76, 76]];
-function domino(stone) {
-  const node = element('span', 'domino');
+function domino(stone, layout) {
+  const values = stone.split('-').map(Number);
+  const node = element('span', values[0] === values[1] ? 'domino double-domino' : 'domino');
   node.setAttribute('role', 'img'); node.setAttribute('aria-label', stone.replace('-', '–'));
   node.title = stone;
-  for (const n of stone.split('-').map(Number)) {
+  for (const n of values) {
     const half = element('span', 'half');
-    for (const [x, y] of (stone === '6-6' ? doubleSixLayout : pipLayout[n])) {
+    for (const [x, y] of (stone === '6-6' && layout !== 'hand' ? doubleSixLayout : pipLayout[n])) {
       const pip = element('i', 'pip'); pip.style.left = `${x}%`; pip.style.top = `${y}%`; half.append(pip);
     }
     node.append(half);
@@ -411,14 +413,21 @@ function renderStep() {
     $('probabilities').append(card);
   }
   $('turn-label').textContent = step.terminal ? 'Раунд завершён' : `Ходит: ${analysis.players[step.turn].name}`;
-  $('chain').replaceChildren(...(step.chain.length ? step.chain.map(domino) : [element('span', 'chain-empty', 'Цепочка ещё не начата')]));
+  const tileTeams = chainTeams(step.chain, analysis.steps[0].hands);
+  $('chain').replaceChildren(...(step.chain.length ? step.chain.map((stone, i) => {
+    const tile = domino(stone), team = tileTeams[i];
+    tile.classList.add(`tile-team-${team}`);
+    tile.title = `${stone} · ${analysis.teams[team]}`;
+    tile.setAttribute('aria-label', `${stone.replace('-', '–')} · ${analysis.teams[team]}`);
+    return tile;
+  }) : [element('span', 'chain-empty', 'Цепочка ещё не начата')]));
   $('ends').textContent = step.ends.length ? `Открытые концы: ${step.ends.join(' и ')}${step.fisher >= 0 ? ` · Последний недубль: ${analysis.players[step.fisher].name}` : ''}` : `Заходит: ${analysis.players[step.turn].name}`;
   $('hands').replaceChildren();
   step.hands.forEach((stones, p) => {
     const card = element('div', `hand ${p % 2 ? 'team-b' : ''} ${!step.terminal && p === step.turn ? 'active' : ''}`);
     card.append(element('div', 'hand-name', analysis.players[p].name), element('div', 'hand-meta', `${analysis.teams[p % 2]} · место ${p + 1} · камней: ${stones.length}`));
     const hand = element('div', 'hand-stones');
-    hand.append(...(stones.length ? stones.map(domino) : [element('span', 'muted', 'Пустая рука')])); card.append(hand); $('hands').append(card);
+    hand.append(...(stones.length ? stones.map(stone => domino(stone, 'hand')) : [element('span', 'muted', 'Пустая рука')])); card.append(hand); $('hands').append(card);
   });
   $('outcome').hidden = !step.terminal;
   $('suit-profile').replaceChildren(renderSuitProfile(step.suits));
@@ -618,6 +627,7 @@ document.addEventListener('keydown', event => {
   if (['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(event.target.tagName)) return;
   if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); selectStep(stepIndex + (event.key === 'ArrowRight' ? 1 : -1)); }
 });
+$('welcome-tiles').replaceChildren(...['1-1', '1-6', '6-3'].map(stone => domino(stone, 'hand')));
 try {
   const { files } = await api('/api/examples');
   for (const file of files) { const option = element('option', '', file); option.value = file; $('examples').append(option); }
