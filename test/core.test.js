@@ -101,7 +101,8 @@ test('дубль не меняет рыбака, неверная ориента
 
 test('точность целых сохраняется за пределами Number.MAX_SAFE_INTEGER', () => {
   const n = 9007199254740993n;
-  const result = summarize({ leaves: n, wins: [n - 1n, 1n, 0n], fish: 1n, eggs: 0n, minDepth: 7, depth: 40 });
+  const result = summarize({ leaves: n, wins: [n - 1n, 1n, 0n], fish: 1n, eggs: 0n, minDepth: 7, depth: 40,
+    outcomes: [n - 1n, 0n, 0n, 0n, 1n, 0n, 0n, 0n, 0n] });
   assert.equal(result.minDepth, 7);
   assert.equal(result.leaves, '9007199254740993');
   assert.deepEqual(result.wins, ['9007199254740992', '1', '0']);

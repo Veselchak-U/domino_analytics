@@ -77,3 +77,4 @@ main{min-width:0}.section-top{flex-wrap:wrap}table{font-variant-numeric:tabular-
 .episodes-heading{display:flex;align-items:baseline;flex-wrap:wrap;gap:10px 18px}.episodes-heading h2{margin:0}.episodes-header{gap:12px}.episodes-header .episode-filter{margin:0 0 0 auto}.episodes-header label{font-size:14px}
 @media(max-width:760px){.episodes-header .episode-filter{margin-left:0}}
 .detail-grid>section{min-width:0}#suit-profile,.candidate-facts{min-width:0;max-width:100%}.candidate-facts .history-scroll{max-width:100%}
+.composition table{min-width:620px}.composition .history-scroll{margin-top:12px}

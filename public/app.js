@@ -110,17 +110,38 @@ function renderTerminalDecision(decision) {
     : 'Партия завершена: аналитический исход рыбы определяется итогом партии, включая ничью, независимо от команды рыбака.'));
   return details;
 }
+function renderOutcomeComposition(result, title) {
+  const details = element('details', 'candidate-facts composition');
+  details.append(element('summary', '', title));
+  const wrap = element('div', 'history-scroll'), table = element('table'), header = element('tr');
+  for (const label of ['Завершение', ...analysis.teams.slice(0, 2), 'Ничья партии', 'Всего']) header.append(element('th', '', label));
+  const thead = element('thead'); thead.append(header); table.append(thead);
+  const body = element('tbody'), denominator = BigInt(result.leaves);
+  for (const [reason, label] of [['emptyHand', 'Выход'], ['fish', 'Рыба'], ['eggs', 'Яйца']]) {
+    const counts = result.outcomes[reason].map(BigInt), row = element('tr'); row.append(element('th', '', label));
+    for (const count of [...counts, counts.reduce((n, v) => n + v, 0n)]) {
+      row.append(element('td', '', `${nf.format(count)} (${formatPointDifference({ numerator: count, denominator })})`));
+    }
+    body.append(row);
+  }
+  const total = element('tr'); total.append(element('th', '', 'Всего'));
+  for (const count of [...result.wins.map(BigInt), denominator]) total.append(element('td', '', nf.format(count)));
+  body.append(total); table.append(body); wrap.append(table); details.append(wrap);
+  details.append(element('p', 'muted', 'Точные количества и доли от всех исходов этой позиции. Строки не пересекаются: яйца выделены отдельно. Общая частота рыбы включает строки «Рыба» и «Яйца» и не равна доле выигрышных рыб.'));
+  return details;
+}
 const pipLayout = [[], [[50, 50]], [[24, 24], [76, 76]], [[24, 24], [50, 50], [76, 76]],
   [[24, 24], [76, 24], [24, 76], [76, 76]],
   [[24, 24], [76, 24], [50, 50], [24, 76], [76, 76]],
   [[24, 24], [76, 24], [24, 50], [76, 50], [24, 76], [76, 76]]];
+const doubleSixLayout = [[24, 24], [50, 24], [76, 24], [24, 76], [50, 76], [76, 76]];
 function domino(stone) {
   const node = element('span', 'domino');
   node.setAttribute('role', 'img'); node.setAttribute('aria-label', stone.replace('-', '–'));
   node.title = stone;
   for (const n of stone.split('-').map(Number)) {
     const half = element('span', 'half');
-    for (const [x, y] of pipLayout[n]) {
+    for (const [x, y] of (stone === '6-6' ? doubleSixLayout : pipLayout[n])) {
       const pip = element('i', 'pip'); pip.style.left = `${x}%`; pip.style.top = `${y}%`; half.append(pip);
     }
     node.append(half);
@@ -401,6 +422,7 @@ function renderStep() {
   });
   $('outcome').hidden = !step.terminal;
   $('suit-profile').replaceChildren(renderSuitProfile(step.suits));
+  $('outcome-composition').replaceChildren(renderOutcomeComposition(step, 'Состав исходов позиции'));
   if (step.terminal) {
     const o = analysis.outcome, reason = { emptyHand: 'Выход', fish: analysis.context.fishVariant === 'withEggs' ? 'Рыба' : 'Рыба без яиц', eggs: 'Рыба с яйцами' }[o.reason];
     const winner = o.analyticsWinner === 2 ? 'Ничья партии' : `Аналитический победитель: ${analysis.teams[o.analyticsWinner]}`;
@@ -439,6 +461,7 @@ function renderStep() {
     card.append(chances, bar, element('div', 'alt-leaves', `${nf.format(BigInt(alternative.leaves))} исходов · ничья ${percent(alternative.probabilities[2], alternative.wins[2], alternative.leaves)}`));
     if (alternative.facts) card.append(renderMoveFacts(alternative.facts, step.turn));
     if (alternative.settlement) card.append(renderTerminalDecision(alternative.settlement));
+    card.append(renderOutcomeComposition(alternative, 'Состав исходов хода'));
     $('alternatives').append(card);
   }
   if (!step.alternatives.length) $('alternatives').append(element('p', 'muted', 'Дальнейших ходов нет. Раунд завершён.'));

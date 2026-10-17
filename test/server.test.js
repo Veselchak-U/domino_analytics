@@ -88,6 +88,13 @@ test('локальный HTTP: проверка, worker, отмена, повт�
       }
     }
     for (const step of result.steps) {
+      for (const distribution of [step, ...step.alternatives]) {
+        const rows = ['emptyHand', 'fish', 'eggs'].map(k => distribution.outcomes[k].map(BigInt));
+        assert.equal(rows.flat().reduce((n, v) => n + v, 0n), BigInt(distribution.leaves));
+        for (let t = 0; t < 3; t++) assert.equal(rows.reduce((n, row) => n + row[t], 0n), BigInt(distribution.wins[t]));
+        assert.equal(rows[2].reduce((n, v) => n + v, 0n), BigInt(distribution.eggs));
+        assert.equal([...rows[1], ...rows[2]].reduce((n, v) => n + v, 0n), BigInt(distribution.fish));
+      }
       assert.equal(step.hands.flat().length + step.chain.length, 28);
       assert.equal(step.wins.reduce((n, s) => n + BigInt(s), 0n), BigInt(step.leaves));
       if (!step.terminal) assert.equal(step.alternatives.filter(a => a.actual).length, 1);
@@ -101,6 +108,10 @@ test('локальный HTTP: проверка, worker, отмена, повт�
         assert.deepEqual(quality.actual.alternative.facts.after.map(h => h.count), next.hands.map(h => h.length));
         assert.equal(quality.actual.alternative.facts.terminal, next.terminal);
         assert.deepEqual(quality.actual.alternative.facts.profile, next.suits);
+        assert.deepEqual(quality.actual.alternative.outcomes, next.outcomes);
+        for (const reason of ['emptyHand', 'fish', 'eggs']) for (let t = 0; t < 3; t++) {
+          assert.equal(BigInt(step.outcomes[reason][t]), step.alternatives.reduce((n, a) => n + BigInt(a.outcomes[reason][t]), 0n));
+        }
         if (next.terminal) assert.deepEqual(quality.actual.alternative.settlement.outcome, result.outcome);
         else assert.equal(quality.actual.alternative.settlement, null);
         assert.deepEqual(quality.actual.alternative.wins, next.wins);
