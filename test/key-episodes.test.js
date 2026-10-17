@@ -34,10 +34,10 @@ test('эпизоды сортируются по точным дробям, ра
   const a = analysis(Array.from({ length: 7 }, (_, i) => position(n / 2n,
     [option(n / 2n, n, true), option(n / 2n + BigInt(i === 0 ? 1 : i), n)], n)));
   const saved = structuredClone(a);
-  const result = keyEpisodes(a);
+  const result = keyEpisodes(a, 5, 0);
   assert.deepEqual(result.losses.map(e => e.actionStep), [7, 6, 5, 4, 3]);
   assert.equal(formatPointDifference(result.losses[0].loss), '<0,01 %');
-  assert.deepEqual(keyEpisodes(a, 7).losses.slice(-2).map(e => e.actionStep), [1, 2]);
+  assert.deepEqual(keyEpisodes(a, 7, 0).losses.slice(-2).map(e => e.actionStep), [1, 2]);
   assert.deepEqual(a, saved);
 });
 
@@ -63,4 +63,40 @@ test('автор второй команды, ничьи и несколько �
   assert.equal(formatPointDifference(e.loss), '10,00 %');
   assert.equal(formatPointDifference(e.impact, true), '−20,00 %');
   assert.equal(e.position, 0);
+});
+
+test('общий порог по умолчанию 3 %, включительно и без учёта знака', () => {
+  const a = analysis([
+    position(47, [option(50, 100n, true), option(53)]),
+    position(53, [option(50, 100n, true), option(53)]),
+    position(4701, [option(5000, 10000n, true), option(5299, 10000n)], 10000n),
+    position(5299, [option(5000, 10000n, true), option(5299, 10000n)], 10000n),
+  ]);
+  const result = keyEpisodes(a);
+  assert.deepEqual(result.losses.map(e => e.actionStep), [1, 2]);
+  assert.deepEqual(result.gains.map(e => e.actionStep), [1]);
+  assert.deepEqual(result.drops.map(e => e.actionStep), [2]);
+  assert.deepEqual(result.spreads.map(e => e.actionStep), [1, 2]);
+  const all = keyEpisodes(a, 5, 0);
+  assert.equal(all.losses.length, 4);
+  assert.equal(all.gains.length, 2);
+  assert.equal(all.drops.length, 2);
+  assert.equal(all.spreads.length, 4);
+  assert.deepEqual(keyEpisodes(a, 5, 3.01), { losses: [], gains: [], drops: [], spreads: [] });
+});
+
+test('фильтр сравнивает точную величину до округления и каждую категорию отдельно', () => {
+  const n = 1000000000000000000n, half = n / 2n, three = n * 3n / 100n;
+  const a = analysis([
+    position(half, [option(half + three - 1n, n, true), option(half, n)], n),
+    position(half, [option(half + three, n, true), option(half, n)], n),
+    position(48, [option(50, 100n, true), option(58)]),
+  ]);
+  assert.equal(formatPointDifference(keyEpisodes(a, 5, 0).gains.find(e => e.actionStep === 1).impact, true), '+3,00 %');
+  assert.deepEqual(keyEpisodes(a).gains.map(e => e.actionStep), [2]);
+  assert.deepEqual(keyEpisodes(a).losses.map(e => e.actionStep), [3]);
+  assert.deepEqual(keyEpisodes(a).spreads.map(e => e.actionStep), [3, 2]);
+  for (const threshold of [-1, 101, NaN, Infinity, 3.001]) {
+    assert.throws(() => keyEpisodes(a, 5, threshold), RangeError);
+  }
 });

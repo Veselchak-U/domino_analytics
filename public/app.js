@@ -11,6 +11,7 @@ const navigationSuffixes = ['', '-history'];
 let game = null, analysis = null, stepIndex = 0, activeJob = null, busy = false;
 let roundAnalyses = new Map(), stopQueue = false, selectedRound = 1;
 let backgroundCalculation = false;
+let episodeMinimum = 3;
 let chartWidth = 960;
 const chartInsets = { left: 120, right: 40 };
 
@@ -233,7 +234,7 @@ function renderQualitySummary() {
 }
 
 function renderKeyEpisodes() {
-  const groups = keyEpisodes(analysis);
+  const groups = keyEpisodes(analysis, 5, episodeMinimum);
   $('episodes-round').textContent = `Раунд ${analysis.number}`;
   $('episode-groups').replaceChildren();
   for (const [key, title, metric, label] of [
@@ -259,7 +260,7 @@ function renderKeyEpisodes() {
       });
       item.append(button); list.append(item);
     }
-    group.append(groups[key].length ? list : element('p', 'muted', 'Подходящих эпизодов нет.'));
+    group.append(groups[key].length ? list : element('p', 'muted', 'Эпизодов по этому фильтру нет.'));
     $('episode-groups').append(group);
   }
 }
@@ -509,6 +510,15 @@ $('examples').addEventListener('change', async () => {
 });
 $('demo').addEventListener('click', () => importSource(() => api('/api/example', { name: 'demo' }), 'Учебная партия · 3 раунда'));
 $('analyze-game').addEventListener('click', analyzeGame);
+$('episode-minimum').addEventListener('input', () => {
+  const input = $('episode-minimum');
+  const valid = input.value !== '' && input.checkValidity();
+  input.setAttribute('aria-invalid', String(!valid));
+  $('episode-filter-error').hidden = valid;
+  if (!valid) return;
+  episodeMinimum = input.valueAsNumber;
+  if (analysis) renderKeyEpisodes();
+});
 $('cancel').addEventListener('click', async () => {
   stopQueue = true;
   if (!activeJob) return;

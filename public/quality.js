@@ -68,9 +68,14 @@ export function summarizePlayerQuality(analyses, players, totalRounds) {
  * loss:Fraction,impact:Fraction,range:Fraction}} Episode
  */
 /** Rank each metric independently using exact fractions; never mutate analysis.
+ * minimumPercent is inclusive, applies to absolute values, and has up to two decimal places.
  * @returns {{losses:Episode[],gains:Episode[],drops:Episode[],spreads:Episode[]}}
  */
-export function keyEpisodes(analysis, limit = 5) {
+export function keyEpisodes(analysis, limit = 5, minimumPercent = 3) {
+  const hundredths = Math.round(minimumPercent * 100);
+  if (!Number.isFinite(minimumPercent) || minimumPercent < 0 || minimumPercent > 100
+    || minimumPercent !== hundredths / 100) throw new RangeError('Порог должен быть от 0 до 100 %, с точностью до 0,01 %.');
+  const threshold = BigInt(hundredths);
   const episodes = [];
   for (let position = 0; position < analysis.steps.length - 1; position++) {
     const step = analysis.steps[position], move = analysis.steps[position + 1].move;
@@ -83,6 +88,10 @@ export function keyEpisodes(analysis, limit = 5) {
   }
   function ranked(metric, negative = false) {
     return episodes.filter(e => negative ? e[metric].numerator < 0n : e[metric].numerator > 0n)
+      .filter(e => {
+        const { numerator, denominator } = e[metric];
+        return (numerator < 0n ? -numerator : numerator) * 10000n >= threshold * denominator;
+      })
       .sort((a, b) => {
         const difference = compare(a[metric], b[metric]);
         return difference === 0n ? a.actionStep - b.actionStep

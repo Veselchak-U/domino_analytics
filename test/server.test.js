@@ -82,6 +82,9 @@ test('локальный HTTP: проверка, worker, отмена, повт�
         if (category === 'losses') assert.ok(e.loss.numerator > 0n);
         if (category === 'gains') assert.ok(e.impact.numerator > 0n);
         if (category === 'drops') assert.ok(e.impact.numerator < 0n);
+        const metric = category === 'losses' ? e.loss : category === 'spreads' ? e.range : e.impact;
+        const magnitude = metric.numerator < 0n ? -metric.numerator : metric.numerator;
+        assert.ok(magnitude * 100n >= 3n * metric.denominator);
       }
     }
     for (const step of result.steps) {
