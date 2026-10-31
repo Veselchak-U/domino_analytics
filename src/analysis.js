@@ -1,6 +1,6 @@
 import { applyMove, countBits, handPoints, legalMoves, positionKey, stonesOf, settle, isTerminal } from './game.js';
 import { createSolver, summarize } from './solver.js';
-import { attributeImpacts, bestOptionsAtSteps, worstOptionsAtSteps } from '../public/impact.js';
+import { attributeImpacts, bestOptionsAtSteps, worstOptionsAtSteps } from '../shared/impact.js';
 import { moveFacts, suitProfile, terminalDecision } from './facts.js';
 
 export function gameSummary(game) {

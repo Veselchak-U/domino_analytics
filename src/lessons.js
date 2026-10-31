@@ -1,9 +1,9 @@
-import { chainTeams } from '../public/domino.js';
+import { chainTeams } from '../shared/domino.js';
 import { lessonData } from './lesson-data.js';
 import { maskOf, stonesOf, stoneId, STONES, SUITS, countBits, applyMove } from './game.js';
 import { analyzeTeachingPosition } from './analysis.js';
-import { motifApplies } from '../public/tactics.js';
-import { decisionQuality } from '../public/impact.js';
+import { motifApplies } from '../shared/tactics.js';
+import { decisionQuality } from '../shared/impact.js';
 
 const figure9 = {
   id: 'figure9', title: 'Свежая масть · рисунок 9', motif: 'source', kind: 'exception', sourceMode: 'given-position',

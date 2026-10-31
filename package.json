@@ -5,14 +5,16 @@
   "type": "module",
   "description": "Точный анализ дерева ходов командного домино",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.13"
   },
   "scripts": {
     "postinstall": "npm ci --prefix tools/ast-index --cache .analysis/npm-cache && node tools/ast-refresh.js rebuild",
     "pretest": "node tools/ast-refresh.js",
     "precheck": "node tools/ast-refresh.js",
     "index": "node tools/ast-refresh.js",
-    "start": "node src/server.js",
+    "start": "node src/start.js",
+    "start:backend": "node src/server.js",
+    "start:frontend": "node src/frontend.js",
     "test": "node --test",
     "check": "node tools/check.js",
     "analyze": "node src/cli.js"

@@ -18,6 +18,8 @@ let episodeMinimum = 3;
 let training = null, trainingAttempts = [], trainingSequence = 0;
 let branch = null;
 let tactics = null, tacticsCatalog = [], tacticsAttempts = [], tacticsSequence = 0;
+let libraryCursor = null;
+const apiBaseUrl = (globalThis.DOMINO_CONFIG?.apiBaseUrl ?? '/api/v1').replace(/\/$/, '');
 let chartWidth = 960;
 const chartInsets = { left: 120, right: 40 };
 
@@ -34,14 +36,14 @@ function showMessage(text, error = false) {
 }
 function setBusy(value) {
   busy = value;
-  for (const id of ['file', 'examples', 'demo', 'open-tactics']) $(id).disabled = value;
+  for (const id of ['file', 'examples', 'saved-games', 'library-more', 'demo', 'open-tactics']) $(id).disabled = value;
   for (const button of $('round-list').children) button.disabled = value;
   $('analyze-game').disabled = value;
   $('explore-current').disabled = value || !analysis;
   updateRoundButtons();
 }
 async function api(url, data, method = data === undefined ? 'GET' : 'POST') {
-  const response = await fetch(url, { method, ...(data === undefined ? {} : {
+  const response = await fetch(url.replace(/^\/api(?=\/)/, apiBaseUrl), { method, ...(data === undefined ? {} : {
     headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
   }) });
   const result = await response.json();
@@ -164,12 +166,38 @@ function chainTiles(stones, context = analysis, teams = chainTeams(stones, conte
   });
 }
 
+async function loadLibrary(append = false, selected = game?.id) {
+  const catalog = await api(`/api/games?limit=20${append && libraryCursor ? `&cursor=${encodeURIComponent(libraryCursor)}` : ''}`);
+  const select = $('saved-games');
+  if (!append) {
+    const placeholder = element('option', '', 'Выберите сохранённую игру'); placeholder.value = '';
+    select.replaceChildren(placeholder);
+  }
+  for (const saved of catalog.games) {
+    if ([...select.options].some(option => option.value === saved.id)) continue;
+    const option = element('option', '', `${saved.fileName} · готово ${saved.completedRounds.length} из ${saved.rounds.length}`);
+    option.value = saved.id; select.append(option);
+  }
+  libraryCursor = catalog.nextCursor;
+  $('library-more').hidden = !libraryCursor;
+  if (selected) {
+    if (![...select.options].some(option => option.value === selected) && game?.id === selected) {
+      const option = element('option', '', game.fileName); option.value = selected; select.prepend(option);
+    }
+    select.value = selected;
+  } else select.value = '';
+}
+
 async function importSource(request, name) {
   if (busy) return;
   setBusy(true); showMessage('Проверяем журнал и воспроизводим ходы…');
   try {
-    game = await request();
-    roundAnalyses = new Map(); stopQueue = false; trainingAttempts = []; training = null;
+    const loaded = await request();
+    const saved = await api(`/api/games/${loaded.id}/analyses`);
+    game = loaded;
+    name = game.fileName ?? name;
+    roundAnalyses = new Map(saved.analyses.map(result => [result.number, result]));
+    stopQueue = false; trainingAttempts = []; training = null;
     analysis = null;
     $('dashboard').hidden = true; $('game-meta').hidden = false;
     $('source-name').textContent = name;
@@ -184,9 +212,12 @@ async function importSource(request, name) {
       button.addEventListener('click', () => selectRound(round.number));
       $('round-list').append(button);
     }
+    await loadLibrary();
+    try { localStorage.setItem('domino-last-game', game.id); } catch { /* Optional preference only. */ }
     showMessage(''); setBusy(false);
     await startAnalysis();
     if (analysis) await analyzeGame();
+    await loadLibrary();
   } catch (e) { showMessage(e.message, true); setBusy(false); }
 }
 
@@ -244,7 +275,10 @@ async function analyzeGame() {
     }
     if (stopQueue) showMessage('Расчёт партии остановлен. Готовые итоги сохранены; можно досчитать оставшиеся раунды.');
   } catch (e) { showMessage(e.message, true); }
-  finally { activeJob = null; backgroundCalculation = false; $('progress').hidden = true; setBusy(false); renderPlayerImpacts(); }
+  finally {
+    activeJob = null; backgroundCalculation = false; $('progress').hidden = true; setBusy(false); renderPlayerImpacts();
+    try { await loadLibrary(); } catch (error) { showMessage(error.message, true); }
+  }
 }
 
 function markSelectedRound(number) {
@@ -830,13 +864,22 @@ $('file').addEventListener('change', async () => {
   const file = $('file').files[0];
   if (!file) return;
   if (file.size > 5 * 1024 * 1024) { showMessage('Максимальный размер файла — 5 МБ', true); $('file').value = ''; return; }
-  await importSource(async () => api('/api/import', { text: await file.text() }), file.name);
+  await importSource(async () => api('/api/import', { text: await file.text(), name: file.name }), file.name);
   $('file').value = '';
 });
 $('examples').addEventListener('change', async () => {
   const name = $('examples').value;
   if (name) await importSource(() => api('/api/example', { name }), name);
   $('examples').value = '';
+});
+$('saved-games').addEventListener('change', async () => {
+  const id = $('saved-games').value;
+  if (id) await importSource(() => api(`/api/games/${id}`), 'Сохранённая партия');
+});
+$('library-more').addEventListener('click', async () => {
+  $('library-more').disabled = true;
+  try { await loadLibrary(true); } catch (error) { showMessage(error.message, true); }
+  finally { $('library-more').disabled = busy; }
 });
 $('demo').addEventListener('click', () => importSource(() => api('/api/example', { name: 'demo' }), 'Учебная партия · 3 раунда'));
 $('analyze-game').addEventListener('click', analyzeGame);
@@ -905,4 +948,8 @@ $('figure5-hand').replaceChildren(...['1-2', '1-3', '1-4', '1-5', '0-0', '0-6', 
 try {
   const { files } = await api('/api/examples');
   for (const file of files) { const option = element('option', '', file); option.value = file; $('examples').append(option); }
+  await loadLibrary();
+  let previous;
+  try { previous = localStorage.getItem('domino-last-game'); } catch { /* Optional preference only. */ }
+  if (previous && /^[a-f0-9]{64}$/.test(previous)) await importSource(() => api(`/api/games/${previous}`), 'Сохранённая партия');
 } catch (e) { showMessage(e.message, true); }

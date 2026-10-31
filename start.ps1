@@ -9,9 +9,9 @@ try {
         -not (Get-Command npm.cmd -ErrorAction SilentlyContinue)) {
         throw 'Установите Node.js 22 или новее, затем повторите запуск.'
     }
-    $majorVersion = & node -p 'parseInt(process.versions.node)'
-    if ($LASTEXITCODE -ne 0 -or [int]$majorVersion -lt 22) {
-        throw 'Для запуска нужен Node.js 22 или новее.'
+    $nodeVersion = & node -p 'process.versions.node'
+    if ($LASTEXITCODE -ne 0 -or [version]$nodeVersion -lt [version]'22.13.0') {
+        throw 'Для запуска нужен Node.js 22.13 или новее.'
     }
 
     if (-not (Test-Path -LiteralPath 'node_modules/ajv/package.json')) {

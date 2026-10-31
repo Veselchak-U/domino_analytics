@@ -6,6 +6,7 @@
   <meta name="description" content="Точный анализ ходов командного домино: вероятности, история и альтернативы.">
   <title>Домино · Аналитика</title>
   <script src="/theme.js"></script>
+  <script src="/config.js"></script>
   <link rel="stylesheet" href="/style.css">
   <script type="module" src="/app.js"></script>
 </head>
@@ -15,8 +16,11 @@
     <div class="side-heading">ИСТОЧНИК ДАННЫХ</div>
     <label class="upload" for="file"><span class="upload-icon">↥</span><strong>Загрузить JSON</strong><span>Журнал kozel-game-v1 · до 5 МБ</span></label>
     <input id="file" type="file" accept=".json,application/json" class="file-input">
+    <label for="saved-games" class="side-heading">СОХРАНЁННЫЕ ИГРЫ</label>
+    <select id="saved-games"><option value="">Выберите сохранённую игру</option></select>
+    <button id="library-more" class="side-button" hidden>Показать ещё игры</button>
     <label for="examples" class="side-heading">ГОТОВЫЕ ЖУРНАЛЫ</label>
-    <select id="examples"><option value="">Выберите файл из out</option></select>
+    <select id="examples"><option value="">Выберите локальный пример</option></select>
     <button id="demo" class="side-button">Открыть учебный пример ↗</button>
     <button id="open-tactics" class="side-button">Командная тактика ↗</button>
     <div id="game-meta" class="game-meta" hidden>

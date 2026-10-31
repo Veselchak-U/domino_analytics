@@ -1,0 +1,3 @@
+deploy/vm/*.sh text eol=lf
+test/vm-deployment.sh text eol=lf
+*-docker.cmd text eol=crlf

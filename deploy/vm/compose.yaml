@@ -1,0 +1,37 @@
+services:
+  app:
+    image: ${DOMINO_IMAGE:?Укажите образ релиза}
+    platform: linux/amd64
+    init: true
+    restart: unless-stopped
+    read_only: true
+    ports:
+      - "127.0.0.1:3210:3210"
+    environment:
+      HOST: 0.0.0.0
+      PORT: "3210"
+      DATABASE_PATH: /data/domino.sqlite
+      DOMINO_EXAMPLES_DIR: /data/examples
+      NODE_OPTIONS: --max-old-space-size=2304
+    volumes:
+      - type: bind
+        source: ${DOMINO_DATA_DIR:?Укажите каталог данных}
+        target: /data
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    mem_limit: 3g
+    cpus: 2
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    stop_grace_period: 15s
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3210/api/examples').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"

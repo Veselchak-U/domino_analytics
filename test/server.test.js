@@ -17,19 +17,8 @@ test('локальный HTTP: проверка, worker, отмена, повт�
     return { status: response.status, data: await response.json() };
   };
   try {
-    assert.equal((await fetch(base)).status, 200);
-    assert.equal((await fetch(base + '/app.js')).status, 200);
-    const theme = await fetch(base + '/theme.js');
-    assert.equal(theme.status, 200);
-    assert.match(theme.headers.get('content-type'), /text\/javascript/);
-    assert.equal((await fetch(base + '/impact.js')).status, 200);
-    assert.equal((await fetch(base + '/quality.js')).status, 200);
-    assert.equal((await fetch(base + '/domino.js')).status, 200);
-    assert.equal((await fetch(base + '/training.js')).status, 200);
-    assert.equal((await fetch(base + '/format.js')).status, 200);
-    const navigation = await fetch(base + '/navigation.js');
-    assert.equal(navigation.status, 200);
-    assert.match(navigation.headers.get('content-type'), /text\/javascript/);
+    assert.equal((await fetch(base)).status, 404);
+    assert.equal((await fetch(base + '/app.js')).status, 404);
     assert.equal((await fetch(base, { headers: { Origin: 'https://other.example' } })).status, 403);
     assert.equal((await request('/api/import', { text: '{}' })).status, 400);
     assert.equal((await request('/api/example', { name: '../package.json' })).status, 400);
