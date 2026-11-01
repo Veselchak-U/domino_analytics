@@ -79,9 +79,9 @@ main{min-width:0}.section-top{flex-wrap:wrap}table{font-variant-numeric:tabular-
 .detail-grid>section{min-width:0}#suit-profile,.candidate-facts{min-width:0;max-width:100%}.candidate-facts .history-scroll{max-width:100%}
 .composition table{min-width:620px}.composition .history-scroll{margin-top:12px}
 .hand-stones .domino{--tile-size:30px;--pip-size:6px}
-.chain .double-domino,.hand-stones .domino,.welcome-tiles>.domino{flex-direction:column;width:var(--tile-size);height:calc(var(--tile-size)*2)}
-.chain .double-domino .half,.hand-stones .half,.welcome-tiles .half{width:100%;height:50%}
-.chain .double-domino .half+.half::before,.hand-stones .half+.half::before,.welcome-tiles .half+.half::before{left:12%;right:12%;top:-1px;bottom:auto;width:auto;height:2px}
+.chain .double-domino,.hand-stones .domino,.entry-tile-pool .domino,.welcome-tiles>.domino{flex-direction:column;width:var(--tile-size);height:calc(var(--tile-size)*2)}
+.chain .double-domino .half,.hand-stones .half,.entry-tile-pool .half,.welcome-tiles .half{width:100%;height:50%}
+.chain .double-domino .half+.half::before,.hand-stones .half+.half::before,.entry-tile-pool .half+.half::before,.welcome-tiles .half+.half::before{left:12%;right:12%;top:-1px;bottom:auto;width:auto;height:2px}
 
 .welcome-tiles{gap:14px;padding:12px 0}.welcome-tiles>.domino{--tile-size:36px;--pip-size:8px}.welcome-tiles>.domino:first-child{transform:rotate(-12deg)}.welcome-tiles>.domino:last-child{transform:rotate(10deg)}
 .chain .tile-team-0{box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--a) 80%,#fffff9)}
@@ -119,6 +119,27 @@ body.entry-active #game-meta{display:none}
 .entry-history{margin:22px 0}.entry-history ol{line-height:1.8;max-height:320px;overflow:auto}
 .entry-final{font-size:1.15rem;font-weight:650;color:var(--a)}
 #entry-chain{padding-block:18px;min-height:90px;overflow-x:auto}
+.entry-board{display:flex;align-items:stretch;position:relative;margin-block:16px;min-width:0;border:2px solid transparent;border-radius:12px}
+.entry-board #entry-chain{flex:1;min-width:0;margin:0}
+.entry-board[data-entry-drop=board]{border-style:dashed;border-color:var(--line)}
+.entry-board[data-entry-side=left] #entry-chain{background:linear-gradient(to right,color-mix(in srgb,var(--a) 24%,var(--highlight)),var(--highlight) 65%)}
+.entry-board[data-entry-side=right] #entry-chain{background:linear-gradient(to left,color-mix(in srgb,var(--a) 24%,var(--highlight)),var(--highlight) 65%)}
+.entry-board[data-entry-preview]::after{content:attr(data-entry-preview);position:absolute;bottom:3px;left:8px;right:8px;text-align:center;font-size:12px;color:var(--ink);pointer-events:none}
+.entry-board[data-entry-drop=board] #entry-chain{padding-bottom:30px}
+.entry-drop{border:2px dashed var(--line);border-radius:12px;padding:14px;transition:border-color .15s,background-color .15s}
+.entry-tile-pool{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0;min-height:82px;padding:14px;border:1px solid var(--line);border-radius:12px}
+#entry-play-tiles>#entry-pass{min-width:52px;flex-shrink:0}
+.entry-drag-stone{display:inline-flex;align-items:center;justify-content:center;padding:10px!important;cursor:grab;flex-shrink:0}
+.entry-drag-stone>*{pointer-events:none}
+.entry-drag-stone:active{cursor:grabbing}
+.entry-drag-stone:disabled{opacity:.28;cursor:not-allowed}
+.entry-dragging{opacity:.45}
+#entry-panel .entry-drop-allowed{border-color:var(--a);background:color-mix(in srgb,var(--a) 13%,transparent);box-shadow:inset 0 0 0 1px var(--a)}
+.entry-drop-pool{border:2px dashed var(--line)}
+.entry-owner .hand-stones{min-height:70px;align-items:center;gap:10px}
+#entry-button-moves{margin:18px 0}
+#entry-button-moves summary{cursor:pointer}
+@media(max-width:760px){.entry-tile-pool{padding:10px;gap:8px}.entry-drag-stone{padding:8px!important}}
 @media(max-width:760px){.entry-fields,.entry-owners{grid-template-columns:1fr}#entry-panel fieldset{padding:14px}#entry-panel{padding:16px}.entry-tools>.button{max-width:100%;white-space:normal}.entry-suggestions{grid-template-columns:repeat(auto-fill,minmax(115px,1fr))}}
 
 #entry-discard{max-width:min(480px,90vw);border:1px solid var(--line);border-radius:15px;padding:24px;color:var(--ink);background:var(--surface,#fff)}

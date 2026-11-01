@@ -35,15 +35,16 @@ export class GameEntry {
         <header class="entry-heading"><h3 id="entry-game-heading"></h3><p id="entry-game-players"></p><p id="entry-game-rules" class="muted"></p><strong id="entry-total"></strong></header>
         <nav id="entry-rounds" class="entry-tools" aria-label="Раунды записи"></nav>
         <h3 id="entry-round-title"></h3><p id="entry-round-state" role="status"></p>
-        <div id="entry-chain" class="chain" aria-label="Цепочка введённых ходов"></div>
+        <div id="entry-board" class="entry-board"><div id="entry-chain" class="chain" aria-label="Цепочка введённых ходов"></div></div>
         <section id="entry-move-panel">
           <div class="entry-tools"><label for="entry-actor">Ходит</label><select id="entry-actor"></select><button id="entry-undo" type="button" class="button secondary">Отменить последний ход</button></div>
           <p class="muted">Подсказки совместимы с известными ходами и пасами. Полная проверка рук и допустимости пасов выполняется после ввода остатков.</p>
-          <div id="entry-suggestions" class="entry-suggestions" aria-label="Подсказки ходов"></div>
+          <div id="entry-play-pool"><h3>Невыставленные камни</h3><p class="muted">Перетащите камень на игровое поле. Если подходит только один край, сторона выберется автоматически. Если подходят оба — отпустите ближе к нужному краю.</p><div id="entry-play-tiles" class="entry-tile-pool" aria-label="Невыставленные камни"><button id="entry-pass" type="button" class="button secondary">Пас</button></div></div>
+          <details id="entry-button-moves"><summary>Выбрать ход кнопкой</summary><div id="entry-suggestions" class="entry-suggestions" aria-label="Подсказки ходов"></div></details>
         </section>
         <section id="entry-remainders" hidden>
-          <h3>Остатки на руках</h3><p>Выберите участника и назначьте ему оставшиеся камни. Нужны все камни, не выложенные на стол.</p>
-          <div id="entry-owners" class="entry-owners"></div><div id="entry-remaining-tiles" class="entry-suggestions"></div>
+          <h3>Остатки на руках</h3><p>Перетащите оставшиеся камни к игрокам. Можно переносить между игроками или возвращать в набор. Для ввода кнопками выберите участника и нажимайте на камни.</p>
+          <div id="entry-owners" class="entry-owners"></div><h4>Неназначенные камни</h4><div id="entry-remaining-tiles" class="entry-tile-pool entry-drop-pool" aria-label="Неназначенные камни · возврат в набор"></div>
           <p id="entry-remaining-count" role="status"></p>
           <button id="entry-assign-rest" type="button" class="button secondary">Назначить оставшиеся выбранному участнику</button>
           <button id="entry-confirm" type="button" class="button primary">Подтвердить раунд и рассчитать счёт</button>
@@ -63,6 +64,30 @@ export class GameEntry {
     $('entry-discard').addEventListener('cancel',event=>{event.preventDefault();this.resolveReplacement(false);});
     $('entry-actor').addEventListener('change',()=>{this.actor=Number($('entry-actor').value);this.renderChoices();});
     $('entry-undo').addEventListener('click',()=>this.change(()=>undoEntryMove(this.entry)));
+    $('entry-pass').addEventListener('click',()=>this.change(()=>appendEntryMove(this.entry,{player:entryPosition(this.entry).players[this.actor].name,action:'pass'})));
+    root.addEventListener('dragstart',event=>this.startDrag(event));
+    const allowDrop=event=>{
+      const target=event.target.closest('[data-entry-drop]');
+      if(!this.drag||!target||!root.contains(target))return;
+      event.preventDefault();event.dataTransfer.dropEffect='move';
+      if(target.dataset.entryDrop==='board'){
+        const side=this.dropAction(target,event.clientX,this.drag.stone),allowed=this.dragAllows(side);
+        target.dataset.entrySide=side;target.dataset.entryPreview=`${{start:'Заход',left:'← Слева',right:'Справа →'}[side]}${allowed?'':' · камень не подходит'}`;
+        target.classList.toggle('entry-drop-allowed',allowed);
+      }
+    };
+    root.addEventListener('dragenter',allowDrop);root.addEventListener('dragover',allowDrop);
+    root.addEventListener('dragleave',event=>{
+      const target=event.target.closest('[data-entry-drop]');
+      if(target?.dataset.entryDrop==='board'&&!target.contains(event.relatedTarget))this.clearBoardPreview();
+    });
+    root.addEventListener('drop',event=>{
+      const target=event.target.closest('[data-entry-drop]'),drag=this.drag;
+      this.clearDrag();
+      if(!drag||!target||!root.contains(target)||drag.entry!==this.entry)return;
+      event.preventDefault();this.dropStone(drag.stone,this.dropAction(target,event.clientX,drag.stone));
+    });
+    root.addEventListener('dragend',()=>this.clearDrag());
     $('entry-confirm').addEventListener('click',()=>this.change(()=>confirmEntryRound(this.entry),false));
     $('entry-next').addEventListener('click',()=>this.change(()=>nextEntryRound(this.entry)));
     $('entry-export').addEventListener('click',()=>this.download(false));
@@ -93,10 +118,11 @@ export class GameEntry {
     return {playedAt:date+(/T\d\d:\d\d$/.test(date)?':00':'')+$('entry-zone').value.trim(),format:'kozel-game-v1',fishVariant:$('entry-variant').value,scoreLimit:Number($('entry-limit').value),teams:[{id:'A',name:$('entry-team-a').value.trim(),players:[players[0],players[2]]},{id:'B',name:$('entry-team-b').value.trim(),players:[players[1],players[3]]}]};
   }
   open(){document.body.classList.add('entry-active');this.root.hidden=false;this.render();$('entry-title').focus();}
-  close(){document.body.classList.remove('entry-active');this.root.hidden=true;}
+  close(){this.clearDrag();document.body.classList.remove('entry-active');this.root.hidden=true;}
   error(message){$('entry-error').hidden=!message;$('entry-error').textContent=message;}
   change(operation,active=true){try{this.entry=operation();this.dirty=true;this.view=active&&this.entry.active?'active':this.entry.document.rounds.length;this.render();}catch(e){this.error(e.message);}}
   render(){
+    this.clearDrag();
     this.error('');$('entry-setup').hidden=!!this.entry;$('entry-session').hidden=!this.entry;$('entry-new').hidden=!this.entry;
     if(!this.entry)return;
     const d=this.entry.document,players=d.teams.flatMap(t=>t.players.map(p=>({...p,team:t.name}))).sort((a,b)=>a.seat-b.seat),teams=[players[0].team,players[1].team];
@@ -116,6 +142,9 @@ export class GameEntry {
     $('entry-round-title').textContent=`Раунд ${active?d.rounds.length+1:round?.number??1}${active?' · запись':' · завершён'}`;
     $('entry-round-state').textContent=!active?'Раунд подтверждён. Общие данные партии сохранены.':p.terminal?p.reason==='emptyHand'?`${players[p.finishedPlayer].name} выложил все семь камней. Победитель раунда — ${players[p.finishedPlayer].team}. Заполните остатки остальных рук.`:'Рыба: ни один оставшийся камень не подходит к концам. Заполните остатки для определения начислений и итога.':p.chain.length?`Следующий ход: ${players[p.turn].name}.`:'Выберите участника и заход. Подсказки учитывают вариант и счёт партии.';
     $('entry-chain').replaceChildren(...chain.map(s=>this.tile(s,'chain')));if(!chain.length)$('entry-chain').append(node('span','muted','Цепочка ещё не начата'));
+    const board=$('entry-board');delete board.dataset.entryDrop;
+    if(active&&!p.terminal){board.dataset.entryDrop='board';if(!chain.length)$('entry-chain').replaceChildren(node('span','','Перетащите сюда камень для захода'));}
+    $('entry-play-tiles').replaceChildren($('entry-pass'));$('entry-owners').replaceChildren();$('entry-remaining-tiles').replaceChildren();delete $('entry-remaining-tiles').dataset.entryDrop;
     $('entry-move-panel').hidden=!active;$('entry-remainders').hidden=!active||!p.terminal;
     if(active){
       if(p.turn!==null)this.actor=p.turn;
@@ -142,23 +171,99 @@ export class GameEntry {
     if(!this.entry?.active)return;
     const p=position??entryPosition(this.entry),player=p.players[this.actor].name;
     const choices=p.terminal?[]:moveSuggestions(this.entry,player);
+    const playable=new Set(choices.filter(m=>m.stone).map(m=>stoneId(m.stone)));
+    $('entry-play-pool').hidden=p.terminal;$('entry-button-moves').hidden=p.terminal;
+    $('entry-pass').hidden=!choices.some(m=>m.action==='pass');
+    $('entry-play-tiles').replaceChildren($('entry-pass'),...STONES.map(pair=>pair.join('-')).filter(s=>!(p.played&(1<<stoneId(s)))).map(s=>{
+      const allowed=playable.has(stoneId(s)),button=this.draggableStone(s,allowed?'Перетащить на поле':'Сейчас нельзя выложить этот камень');
+      button.disabled=!allowed;button.draggable=allowed;return button;
+    }));
+    if(p.terminal)$('entry-play-tiles').replaceChildren($('entry-pass'));
     $('entry-suggestions').replaceChildren(...choices.map(m=>{const b=node('button','button secondary entry-choice');b.type='button';b.setAttribute('aria-label',`${player}: ${actionLabel(m)}`);if(m.stone)b.append(this.tile(m.stone,'chain'));b.append(node('span','',actionLabel(m)));b.onclick=()=>this.change(()=>appendEntryMove(this.entry,m));return b;}));
   }
   renderRemainders(p){
     const remaining=this.entry.active.remaining;
     if(!p.capacities[this.owner])this.owner=p.capacities.findIndex(c=>c>0);
     $('entry-owners').replaceChildren(...p.players.map((a,i)=>{
-      const card=node('div','entry-owner'),button=node('button','button secondary',`${a.name} · ${remaining[i].length} / ${p.capacities[i]}`);button.type='button';button.disabled=!p.capacities[i];button.setAttribute('aria-pressed',String(i===this.owner));button.onclick=()=>{this.owner=i;this.renderRemainders(p);};
-      const hand=node('div','hand-stones');hand.append(...remaining[i].map(s=>this.tile(s,'hand')));card.append(button,hand);return card;
+      const card=this.dropZone(String(i),'');card.className='entry-owner entry-drop';
+      const button=node('button','button secondary',`${a.name} · ${remaining[i].length} / ${p.capacities[i]}`);button.type='button';button.disabled=!p.capacities[i];button.setAttribute('aria-pressed',String(i===this.owner));button.onclick=()=>{this.clearDrag();this.owner=i;this.renderRemainders(p);};
+      const hand=node('div','hand-stones');hand.append(...remaining[i].map(s=>this.draggableStone(s,'Вернуть в набор',()=>this.assignStone(s,-1))));if(!remaining[i].length)hand.append(node('span','muted',p.capacities[i]?'Перетащите камни сюда':'Все камни выложены'));card.append(button,hand);return card;
     }));
     const available=STONES.map(pair=>pair.join('-')).filter(s=>!(p.played&(1<<stoneId(s))));
-    $('entry-remaining-tiles').replaceChildren(...available.map(s=>{
-      const owner=remaining.findIndex(h=>h.includes(s)),b=node('button','button secondary entry-choice');b.type='button';b.dataset.owner=String(owner);b.setAttribute('aria-label',`${s.replace('-','–')}${owner>=0?' — '+p.players[owner].name:' — назначить '+p.players[this.owner].name}`);b.setAttribute('aria-pressed',String(owner>=0));b.append(this.tile(s,'chain'));b.append(node('span','',owner>=0?p.players[owner].name:'Назначить'));
-      b.onclick=()=>{const next=remaining.map(h=>h.filter(t=>t!==s));if(owner!==this.owner)next[this.owner].push(s);this.change(()=>setRemainders(this.entry,next));};return b;
-    }));
+    $('entry-remaining-tiles').dataset.entryDrop='pool';
+    $('entry-remaining-tiles').replaceChildren(...available.filter(s=>!remaining.some(h=>h.includes(s))).map(s=>this.draggableStone(s,`Назначить: ${p.players[this.owner].name}`,()=>this.assignStone(s,this.owner))));
+    if(!$('entry-remaining-tiles').children.length)$('entry-remaining-tiles').append(node('span','muted','Все камни распределены. Перетащите сюда камень, чтобы вернуть в набор.'));
     const assigned=remaining.reduce((n,h)=>n+h.length,0);$('entry-remaining-count').textContent=`Распределено ${assigned} из ${available.length}. Выбран участник: ${p.players[this.owner].name}.`;
     $('entry-confirm').disabled=remaining.some((h,i)=>h.length!==p.capacities[i]);
     $('entry-assign-rest').disabled=p.capacities[this.owner]-remaining[this.owner].length!==available.length-assigned||assigned===available.length;
+  }
+  dropZone(target,label){const zone=node('div','entry-drop',label);zone.dataset.entryDrop=target;return zone;}
+  draggableStone(stone,label,click){
+    const b=node('button','button secondary entry-drag-stone');b.type='button';b.draggable=true;b.dataset.entryStone=stone;
+    b.setAttribute('aria-label',`${stone.replace('-','–')} · ${label}`);b.title=label;b.append(this.tile(stone,'hand'));
+    if(click)b.onclick=click;return b;
+  }
+  /** Drag state is local to this editor and never read from an external DataTransfer. */
+  startDrag(event){
+    this.clearDrag();const tile=event.target.closest('[data-entry-stone]');
+    if(!tile||tile.disabled||!this.root.contains(tile)||this.view!=='active'||!this.entry?.active){event.preventDefault();return;}
+    this.drag={stone:tile.dataset.entryStone,entry:this.entry};
+    event.dataTransfer.effectAllowed='move';event.dataTransfer.setData('text/plain',this.drag.stone);
+    this.error('');tile.classList.add('entry-dragging');
+    for(const zone of this.root.querySelectorAll('[data-entry-drop]')){
+      const target=zone.dataset.entryDrop;
+      zone.classList.toggle('entry-drop-allowed',target==='board'?['start','left','right'].some(side=>this.dragAllows(side)):this.dragAllows(target));
+    }
+  }
+  clearDrag(){
+    this.drag=null;
+    this.clearBoardPreview();
+    for(const n of this.root.querySelectorAll('.entry-drop-allowed'))n.classList.remove('entry-drop-allowed');
+    for(const n of this.root.querySelectorAll('.entry-dragging'))n.classList.remove('entry-dragging');
+  }
+  clearBoardPreview(){
+    const board=$('entry-board');delete board.dataset.entrySide;delete board.dataset.entryPreview;board.classList.remove('entry-drop-allowed');
+  }
+  /** Prefer the only legal side; resolve two legal sides against current viewport bounds. */
+  dropAction(target,clientX,stone){
+    if(target.dataset.entryDrop!=='board')return target.dataset.entryDrop;
+    const p=entryPosition(this.entry);
+    if(!p.chain.length)return 'start';
+    const moves=moveSuggestions(this.entry,p.players[this.actor].name).filter(m=>m.stone&&stoneId(m.stone)===stoneId(stone));
+    if(moves.length===1)return moves[0].action;
+    const {left,right}=target.getBoundingClientRect();return clientX<(left+right)/2?'left':'right';
+  }
+  moveForDrop(stone,side){
+    const p=entryPosition(this.entry);
+    return moveSuggestions(this.entry,p.players[this.actor].name).find(m=>m.action===side&&m.stone&&stoneId(m.stone)===stoneId(stone));
+  }
+  remainderWith(stone,owner){
+    const remaining=this.entry.active.remaining.map(h=>h.filter(s=>stoneId(s)!==stoneId(stone)));
+    if(owner>=0)remaining[owner].push(stone);return remaining;
+  }
+  assignStone(stone,owner){this.change(()=>setRemainders(this.entry,this.remainderWith(stone,owner)));}
+  dragAllows(target){
+    try{
+      if(!this.drag||this.drag.entry!==this.entry)return false;
+      if(entryPosition(this.entry).terminal){
+        if(target!=='pool'&&!/^[0-3]$/.test(target))return false;
+        setRemainders(this.entry,this.remainderWith(this.drag.stone,target==='pool'?-1:Number(target)));return true;
+      }
+      return !!this.moveForDrop(this.drag.stone,target);
+    }catch{return false;}
+  }
+  dropStone(stone,target){
+    if(this.view!=='active'||!this.entry?.active)return;
+    this.change(()=>{
+      const p=entryPosition(this.entry);
+      if(p.terminal){
+        if(target!=='pool'&&!/^[0-3]$/.test(target))throw new Error('Перенесите остаток к игроку или в набор');
+        return setRemainders(this.entry,this.remainderWith(stone,target==='pool'?-1:Number(target)));
+      }
+      const move=this.moveForDrop(stone,target);
+      if(!move)throw new Error('Этот камень нельзя выложить в выбранную зону. Проверьте край и очередь хода.');
+      return appendEntryMove(this.entry,move);
+    });
   }
   async download(analyze){
     try{
