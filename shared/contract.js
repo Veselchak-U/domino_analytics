@@ -3,8 +3,8 @@ import { normalizeInstant } from './time.js';
 import { strictJson } from './json.js';
 import validate from './game-schema.js';
 
-export const RESULT_VERSION = Object.freeze({ rules: 1, engine: 1, metrics: 1, schema: 1 });
-export const VERSION_ID = 'rules-1.engine-1.metrics-1.schema-1';
+export const RESULT_VERSION = Object.freeze({ rules: 2, engine: 1, metrics: 1, schema: 1 });
+export const VERSION_ID = 'rules-2.engine-1.metrics-1.schema-1';
 export const LIMITS = Object.freeze({ source: 5*1024*1024, import: 11*1024*1024, result: 16*1024*1024 });
 export function fault(message, statusCode = 400, code = 'INVALID_DATA') { return Object.assign(new Error(message), { statusCode, code }); }
 export function codepointCompare(a,b) { const x=[...a],y=[...b]; for(let i=0;i<Math.min(x.length,y.length);i++){const d=x[i].codePointAt(0)-y[i].codePointAt(0);if(d)return d;}return x.length-y.length; }
@@ -19,10 +19,11 @@ export async function digest(value) {
   return Array.from(new Uint8Array(bytes), b=>b.toString(16).padStart(2,'0')).join('');
 }
 export { normalizeInstant, validDateTime } from './time.js';
-export function validateSource(text) {
+export function validateSource(text, { allowIncomplete = false } = {}) {
   if(typeof text!=='string'||new TextEncoder().encode(text).length>LIMITS.source) throw fault('Ожидается JSON-файл размером до 5 МиБ',413,'SOURCE_TOO_LARGE');
   const data=strictJson(text);
   if(!validate(data))throw fault('Ошибка схемы JSON: '+validate.errors.slice(0,4).map(e=>`${e.instancePath||'/'}: ${e.message}`).join('; '));
+  if(data.status==='incomplete'&&!allowIncomplete)throw fault('Партия не завершена (status: incomplete). Продолжите ввод в форме и загрузите завершённую партию.',400,'INCOMPLETE_GAME');
   normalizeInstant(data.playedAt);
   const players=data.teams.flatMap(t=>t.players);
   if(new Set(players.map(p=>p.name)).size!==4||new Set(players.map(p=>p.seat)).size!==4||new Set(data.teams.map(t=>t.id)).size!==2||new Set(data.teams.map(t=>t.name)).size!==2)throw fault('Повтор имён, ID команд или места игроков');
@@ -32,7 +33,7 @@ export function validateSource(text) {
 export function identityDescriptor(data) { return { playedAt:normalizeInstant(data.playedAt),players:data.teams.flatMap(t=>t.players.map(p=>p.name)).sort(codepointCompare) }; }
 export const identityOf = data => digest(identityDescriptor(data));
 export function canonicalSource(data) {
-  const d=structuredClone(data);d.playedAt=normalizeInstant(d.playedAt);
+  const d=structuredClone(data);if(d.status==='complete')delete d.status;d.playedAt=normalizeInstant(d.playedAt);
   d.teams.sort((a,b)=>codepointCompare(a.id,b.id));d.teams.forEach(t=>t.players.sort((a,b)=>a.seat-b.seat));
   d.rounds.forEach(r=>Object.values(r.deal).forEach(h=>h.sort(codepointCompare)));
   return d;

@@ -4,6 +4,11 @@ for (let a = 0; a <= 6; a++) for (let b = a; b <= 6; b++) STONES.push([a, b]);
 export const SUITS = Array.from({ length: 7 }, (_, n) => STONES.reduce((m, [a, b], i) => m | (a === n || b === n ? 1 << i : 0), 0));
 const IDS = new Map(STONES.map(([a, b], i) => [`${a}-${b}`, i]));
 
+/** Mandatory 1–1 depends on variant and round number, not just the score. */
+export function forcedOpening(context, roundNumber) {
+  return roundNumber === 1 || (context.fishVariant === 'withEggs' && context.score.every(s => s === 0)) ? stoneId('1-1') : null;
+}
+
 export function stoneId(stone) {
   if (typeof stone !== 'string' || !/^[0-6]-[0-6]$/.test(stone)) throw new Error(`Неверный камень: ${stone}`);
   const [a, b] = stone.split('-').map(Number);

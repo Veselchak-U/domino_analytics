@@ -8,7 +8,7 @@
   <script src="/theme.js"></script>
   <script src="/config.js"></script>
   <link rel="stylesheet" href="/style.css">
-  <script type="module" src="/app.js?v=client-1"></script>
+  <script type="module" src="/app.js?v=entry-1"></script>
 </head>
 <body>
   <aside class="sidebar">
@@ -16,6 +16,7 @@
     <div class="side-heading">ИСТОЧНИК ДАННЫХ</div>
     <label class="upload" for="file"><span class="upload-icon">↥</span><strong>Загрузить JSON</strong><span>Журнал kozel-game-v1 · до 5 МБ</span></label>
     <input id="file" type="file" accept=".json,application/json" class="file-input">
+    <button id="open-entry" class="side-button">Записать партию ↗</button>
     <label for="saved-games" class="side-heading">СОХРАНЁННЫЕ ИГРЫ</label>
     <select id="saved-games"><option value="">Выберите сохранённую игру</option></select>
     <button id="library-more" class="side-button" hidden>Показать ещё игры</button>
@@ -35,6 +36,7 @@
   <main>
     <header class="topbar"><div class="game-heading"><span id="game-source" hidden></span><span id="game-variant">Вариант игры: выберите журнал</span></div><button id="theme-toggle" class="button secondary theme-toggle" type="button" aria-pressed="false" aria-label="Включить тёмную тему">☾ Тёмная тема</button></header>
     <div id="message" class="message" role="status" aria-live="polite" hidden></div>
+    <section id="entry-panel" class="panel" hidden aria-label="Запись партии"></section>
     <section id="save-panel" class="panel" hidden><p id="save-status" role="status" aria-live="polite"></p><p id="save-error" class="muted"></p><button id="save-retry" class="button secondary" hidden>Повторить сохранение</button></section>
     <section id="progress" class="progress-panel" hidden>
       <div class="progress-top"><div><strong>Строим полное дерево</strong><p id="progress-text">Подготовка расчёта…</p></div><button id="cancel" class="button secondary">Отменить</button></div>

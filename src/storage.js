@@ -1,14 +1,14 @@
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
-import { canonical, fault, RESULT_VERSION as CLIENT_VERSION } from '../shared/contract.js';
-export const RESULT_VERSION='rules-1.engine-1.metrics-1.schema-1';
+import { canonical, fault, RESULT_VERSION as CLIENT_VERSION, VERSION_ID } from '../shared/contract.js';
+export { VERSION_ID as RESULT_VERSION } from '../shared/contract.js';
 export const STORAGE_SCHEMA=3;
 /** The backend owns one SQLite connection and stores only sources and compact finished results. */
 export class Storage {
-  constructor(filename=':memory:',version=RESULT_VERSION) {
+  constructor(filename=':memory:',version=VERSION_ID) {
     if(filename!==':memory:')mkdirSync(path.dirname(path.resolve(filename)),{recursive:true});
-    this.db=new DatabaseSync(filename);this.clientVersion=version===RESULT_VERSION?canonical(CLIENT_VERSION):version;
+    this.db=new DatabaseSync(filename);this.clientVersion=version===VERSION_ID?canonical(CLIENT_VERSION):version;
     try {
       this.db.exec('PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL;');
       const schema=this.db.prepare('PRAGMA user_version').get().user_version;

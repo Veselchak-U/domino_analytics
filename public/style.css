@@ -94,3 +94,32 @@ body.branch-active main{margin:0 auto;width:100%;max-width:1200px;padding:20px}.
 
 body.tactics-active .sidebar,body.tactics-active main>:not(#tactics-panel){display:none!important}
 body.tactics-active main{margin:0 auto;width:100%;max-width:1200px;padding:20px}#tactics-panel select{font:inherit;padding:8px;max-width:100%;color:var(--ink);background:var(--surface)}#tactics-panel .section-top{flex-wrap:wrap}#tactics-choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(260px,100%),1fr));gap:14px}#tactics-board,#tactics-choices>.alternative{min-width:0}#tactics-context,#tactics-feedback,#tactics-progress,#tactics-status{line-height:1.7;overflow-wrap:anywhere}#figure5-hand{margin-top:15px}
+
+body.entry-active main>:not(#entry-panel){display:none!important}
+body.entry-active #game-meta{display:none}
+#entry-panel{min-width:0;margin-top:24px;padding:24px}
+#entry-panel .section-top{flex-wrap:wrap;gap:14px}
+#entry-panel p{line-height:1.65;overflow-wrap:anywhere}
+#entry-panel fieldset{border:1px solid var(--line);border-radius:12px;padding:20px;margin:20px 0}
+#entry-panel legend{padding:0 8px;font-weight:650}
+.entry-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.entry-fields label{display:flex;flex-direction:column;gap:8px}
+#entry-panel input:not([type=file]),#entry-panel select{padding:11px;border:1px solid var(--line);border-radius:8px;color:var(--ink);background:var(--surface,#fff);min-width:0;max-width:100%}
+.entry-tools{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin:20px 0}
+.entry-heading{border-block:1px solid var(--line);padding:16px 0;margin-top:22px}
+.entry-heading h3{margin:0;overflow-wrap:anywhere}
+.entry-suggestions{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin:20px 0}
+.entry-choice{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;min-height:102px;padding:12px 8px!important;white-space:normal}
+.entry-choice .domino{flex-shrink:0}
+.entry-owners{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.entry-owner{padding:12px;border:1px solid var(--line);border-radius:10px;min-width:0}
+.entry-owner .hand-stones{margin-top:12px;flex-wrap:wrap}
+#entry-panel [aria-pressed=true]{outline:2px solid var(--a);outline-offset:1px}
+#entry-remaining-tiles [data-owner="1"],#entry-remaining-tiles [data-owner="3"]{outline-color:var(--b)}
+.entry-history{margin:22px 0}.entry-history ol{line-height:1.8;max-height:320px;overflow:auto}
+.entry-final{font-size:1.15rem;font-weight:650;color:var(--a)}
+#entry-chain{padding-block:18px;min-height:90px;overflow-x:auto}
+@media(max-width:760px){.entry-fields,.entry-owners{grid-template-columns:1fr}#entry-panel fieldset{padding:14px}#entry-panel{padding:16px}.entry-tools>.button{max-width:100%;white-space:normal}.entry-suggestions{grid-template-columns:repeat(auto-fill,minmax(115px,1fr))}}
+
+#entry-discard{max-width:min(480px,90vw);border:1px solid var(--line);border-radius:15px;padding:24px;color:var(--ink);background:var(--surface,#fff)}
+#entry-discard::backdrop{background:#0009}

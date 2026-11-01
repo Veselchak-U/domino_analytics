@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Завершённая партия «Козла», компактный журнал v1",
+  "title": "Партия «Козла», компактный журнал v1",
   "description": "Документный контракт. Структура проверяется схемой; имена, законность раздач и ходов, счёт и завершённость — последовательным воспроизведением по README.md.",
   "type": "object",
   "properties": {
@@ -11,6 +11,11 @@
     },
     "format": {
       "const": "kozel-game-v1"
+    },
+    "status": {
+      "enum": ["complete", "incomplete"],
+      "default": "complete",
+      "description": "Завершённость партии: отсутствие поля трактуется как complete. incomplete допускает только завершённые раунды и запрещает корневой result. Фактическое завершение проверяется воспроизведением."
     },
     "fishVariant": {
       "enum": [
@@ -73,11 +78,18 @@
     "fishVariant",
     "scoreLimit",
     "teams",
-    "rounds",
-    "result"
+    "rounds"
   ],
   "additionalProperties": false,
   "allOf": [
+    {
+      "if": {
+        "required": ["status"],
+        "properties": {"status": {"const": "incomplete"}}
+      },
+      "then": {"not": {"required": ["result"]}},
+      "else": {"required": ["result"]}
+    },
     {
       "if": {
         "properties": {

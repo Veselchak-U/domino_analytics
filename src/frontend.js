@@ -59,7 +59,7 @@ export function createFrontend({ backendUrl = 'http://127.0.0.1:3211', apiBaseUr
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end('{"status":"ok"}');
     }
-    const shared = /^\/shared\/(impact|domino|tactics|game|solver|facts|analysis|lessons|lesson-data|input|json|contract|game-schema|time|equal|lesson-manifest)\.js$/.test(route);
+    const shared = /^\/shared\/(impact|domino|tactics|game|game-entry|solver|facts|analysis|lessons|lesson-data|input|json|contract|game-schema|time|equal|lesson-manifest)\.js$/.test(route);
     const asset = route === '/' || route === '/index.html' ? 'index.html'
       : /^\/[a-z-]+\.(js|css)$/.test(route) ? route.slice(1) : null;
     if (!shared && !asset) return json(res, 404, 'Не найдено');

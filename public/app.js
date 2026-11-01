@@ -1,4 +1,5 @@
 import { AnalysisClient } from './analysis-client.js';
+import { GameEntry } from './game-entry.js';
 import { lessonManifest } from '../shared/lesson-manifest.js';
 import { motifApplies } from './tactics.js';
 import { keyEpisodes, summarizePlayerQuality } from './quality.js';
@@ -23,6 +24,8 @@ let tactics = null, tacticsCatalog = [], tacticsAttempts = [], tacticsSequence =
 let libraryCursor = null;
 const apiBaseUrl = (globalThis.DOMINO_CONFIG?.apiBaseUrl ?? '/api/v1').replace(/\/$/, '');
 const client = new AnalysisClient(api, { onChange: renderSaveStatus });
+const editor = new GameEntry({root:$('entry-panel'),tile:domino,onAnalyze:(text,fileName)=>importSource(async()=>({text,fileName}),fileName)});
+$('open-entry').addEventListener('click',()=>{if(!busy)editor.open();});
 function renderSaveStatus() {
   const states=[...client.states.values()];
   const pending=client.pending.size;
@@ -56,7 +59,7 @@ function showMessage(text, error = false) {
 }
 function setBusy(value) {
   busy = value;
-  for (const id of ['file', 'examples', 'saved-games', 'library-more', 'demo', 'open-tactics']) $(id).disabled = value;
+  for (const id of ['file', 'examples', 'saved-games', 'library-more', 'demo', 'open-tactics', 'open-entry']) $(id).disabled = value;
   for (const button of $('round-list').children) button.disabled = value;
   $('analyze-game').disabled = value;
   $('explore-current').disabled = value || !analysis;
@@ -210,6 +213,7 @@ async function loadLibrary(append = false, selected = game?.id) {
 
 async function importSource(request, name) {
   if (busy) return;
+  editor.close();
   setBusy(true); showMessage('Проверяем журнал и воспроизводим ходы…');
   try {
     const loaded = await request();
@@ -891,7 +895,7 @@ $('library-more').addEventListener('click', async () => {
 });
 $('demo').addEventListener('click', () => importSource(async () => ({text:await sourceText('/api/examples/demo/source')}), 'Учебная партия · 3 раунда'));
 $('analyze-game').addEventListener('click', analyzeGame);
-$('open-tactics').addEventListener('click', openTactics);
+$('open-tactics').addEventListener('click',()=>{editor.close();openTactics();});
 for (const id of ['tactics-select', 'tactics-mirror']) $(id).addEventListener('change', loadTactic);
 $('tactics-retry').addEventListener('click', loadTactic);
 $('tactics-next').addEventListener('click', () => {
@@ -935,7 +939,7 @@ $('episode-minimum').addEventListener('input', () => {
 $('cancel').addEventListener('click',()=>{stopQueue=true;$('cancel').disabled=true;client.cancel();});
 $('save-retry').addEventListener('click',async()=>{await client.retry();try{await loadLibrary();}catch{/* Keep pending local data. */}});
 $('cache-size').addEventListener('change',()=>{client.computation.cacheEntries=Number($('cache-size').value);});
-window.addEventListener('beforeunload',event=>{if(client.unsaved||client.computation.active){event.preventDefault();event.returnValue='';}});
+window.addEventListener('beforeunload',event=>{if(editor.dirty||client.unsaved||client.computation.active){event.preventDefault();event.returnValue='';}});
 
 for (const suffix of navigationSuffixes) {
   $(`slider${suffix}`).addEventListener('input', () => selectStep(Number($(`slider${suffix}`).value)));
@@ -945,7 +949,7 @@ for (const suffix of navigationSuffixes) {
   $(`next${suffix}`).addEventListener('click', () => selectStep(stepIndex + 1));
 }
 document.addEventListener('keydown', event => {
-  if (training || branch || tactics) return;
+  if (training || branch || tactics || document.body.classList.contains('entry-active')) return;
   if (['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(event.target.tagName)) return;
   if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); selectStep(stepIndex + (event.key === 'ArrowRight' ? 1 : -1)); }
 });

@@ -1,5 +1,5 @@
 import { validateSource, canonical } from './contract.js';
-import { applyMove, countBits, maskOf, settle, stoneId, SUITS, STONES } from './game.js';
+import { applyMove, countBits, maskOf, settle, forcedOpening, SUITS, STONES } from './game.js';
 const deepEqual=(a,b)=>canonical(a)===canonical(b);
 export { strictJson } from './json.js';
 
@@ -20,9 +20,9 @@ export function recordedResult(outcome, players, teams) {
   return result;
 }
 
-/** Validate the entire completed game before making any analysis available. */
-export function parseGame(text) {
-  const data = validateSource(text);
+/** Replay the whole journal; incomplete games require the editor's explicit option. */
+export function parseGame(text, options) {
+  const data = validateSource(text, options);
   unique(data.teams.map(t => t.name), 'имена команд');
   unique(data.teams.map(t => t.id), 'ID команд');
   const players = data.teams.flatMap(t => t.players.map(p => ({ ...p, teamName: t.name }))).sort((a, b) => a.seat - b.seat);
@@ -46,7 +46,7 @@ export function parseGame(text) {
         if (countBits(hand & doubles) >= 5 || SUITS.some(s => countBits(hand & s) >= 6))
           throw new Error(`Раздача ${names[p]} требует пересдачи`);
       }
-      const forcedStart = context.score.every(s => s === 0) ? stoneId('1-1') : null;
+      const forcedStart = forcedOpening(context, index + 1);
       const turn = forcedStart !== null ? hands.findIndex(h => h & (1 << forcedStart)) : previous.finishedPlayer;
       let state = { hands, left: null, right: null, turn, fisher: -1, forcedStart };
       let chain = [];
@@ -70,8 +70,12 @@ export function parseGame(text) {
       context = { ...context, score: outcome.totalScore, fence: outcome.fence, eggs: outcome.eggs };
     } catch (e) { throw new Error(`${prefix}, ${e.message}`); }
   }
-  if (previous.gameWinner === null) throw new Error('Партия не завершена последним раундом');
-  const expected = previous.gameWinner === 2 ? { draw: true } : { winner: teams[previous.gameWinner] };
-  if (!deepEqual(expected, data.result)) throw new Error(`Итог партии не совпадает: ожидается ${JSON.stringify(expected)}`);
-  return { playedAt: data.playedAt, teams, players, rounds, result: data.result, fishVariant: data.fishVariant, scoreLimit: data.scoreLimit };
+  const incomplete=data.status==='incomplete';
+  if(incomplete&&previous.gameWinner!==null)throw new Error('Партия уже завершена: status incomplete недопустим');
+  if(!incomplete){
+    if(previous.gameWinner===null)throw new Error('Партия не завершена последним раундом');
+    const expected=previous.gameWinner===2?{draw:true}:{winner:teams[previous.gameWinner]};
+    if(!deepEqual(expected,data.result))throw new Error(`Итог партии не совпадает: ожидается ${JSON.stringify(expected)}`);
+  }
+  return { playedAt:data.playedAt,teams,players,rounds,result:data.result??null,fishVariant:data.fishVariant,scoreLimit:data.scoreLimit };
 }

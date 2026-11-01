@@ -13,7 +13,7 @@ test('отдельные frontend и backend: статика, API, Origin и н�
   const base = `http://127.0.0.1:${frontend.server.address().port}`;
   origins.push(base);
   try {
-    for (const file of ['/', '/app.js', '/impact.js', '/shared/impact.js', '/config.js', '/style.css',
+    for (const file of ['/', '/app.js', '/game-entry.js', '/shared/game-entry.js', '/impact.js', '/shared/impact.js', '/config.js', '/style.css',
       '/theme.js', '/quality.js', '/domino.js', '/training.js', '/format.js', '/navigation.js', '/tactics.js']) {
       assert.equal((await fetch(base + file)).status, 200, file);
     }
