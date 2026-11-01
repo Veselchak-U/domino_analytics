@@ -1,12 +1,14 @@
+import { parseGame } from '../src/input.js';
+import { analyzeRound } from '../src/analysis.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync } from './helpers/fixtures.js';
 import { createApp } from '../src/server.js';
 import { decisionQuality } from '../public/impact.js';
 import { keyEpisodes, summarizePlayerQuality } from '../public/quality.js';
 import { trainingQuestion, gradeTrainingChoice } from '../public/training.js';
 
-test('локальный HTTP: проверка, worker, отмена, повтор, кеш и восстановление после ошибки', { timeout: 120000 }, async () => {
+test('локальный анализ и HTTP: точность, исходы, факты, качество и отсутствие серверного вычислителя', { timeout: 120000 }, async () => {
   const app = createApp({ examplesDir: new URL('./fixtures', import.meta.url).pathname });
   await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${app.server.address().port}`;
@@ -21,24 +23,10 @@ test('локальный HTTP: проверка, worker, отмена, повт�
     assert.equal((await fetch(base + '/app.js')).status, 404);
     assert.equal((await fetch(base, { headers: { Origin: 'https://other.example' } })).status, 403);
     assert.equal((await request('/api/import', { text: '{}' })).status, 400);
-    assert.equal((await request('/api/example', { name: '../package.json' })).status, 400);
-    const text = readFileSync(new URL('./fixtures/real-game.json', import.meta.url), 'utf8');
-    const { data: game } = await request('/api/import', { text });
-    assert.equal(game.rounds.length, 1);
-    const { data: cancelled } = await request('/api/analyze', { gameId: game.id, round: 1 });
-    assert.equal(cancelled.status, 'running');
-    assert.equal(cancelled.stats.cacheBytesEstimate, 0);
-    assert.equal((await request(`/api/jobs/${cancelled.id}`, undefined, 'DELETE')).data.status, 'cancelled');
-    const { data: started } = await request('/api/analyze', { gameId: game.id, round: 1 });
-    let job = started;
-    while (job.status === 'running') {
-      assert.ok(Number.isInteger(job.stats.cacheBytesEstimate) && job.stats.cacheBytesEstimate >= 0);
-      await new Promise(resolve => setTimeout(resolve, 100));
-      job = (await request(`/api/jobs/${job.id}`)).data;
-    }
-    assert.equal(job.status, 'done', job.error);
-    assert.ok(job.stats.cacheBytesEstimate > 0);
-    const { result } = job;
+    assert.equal((await request('/api/example', {name:'demo'})).status,410);
+    const text=readFileSync(new URL('./fixtures/real-game.json',import.meta.url),'utf8');
+    const {data:game}=await request('/api/import',{text});
+    const result=analyzeRound(parseGame(text),0);
     assert.equal(result.base.leaves, '7328406');
     assert.equal(result.base.depth, 40);
     assert.ok(Number.isInteger(result.base.minDepth) && result.base.minDepth > 0 && result.base.minDepth <= result.base.depth);
@@ -135,9 +123,6 @@ test('локальный HTTP: проверка, worker, отмена, повт�
         }
       }
     }
-    const cached = (await request('/api/analyze', { gameId: game.id, round: 1 })).data;
-    assert.equal(cached.cached, true);
-    assert.deepEqual(cached.result.base, result.base);
-    assert.equal((await request('/api/analyze', { gameId: game.id, round: 0 })).status, 400);
+    assert.equal((await request('/api/analyze',{gameId:game.id,round:1})).status,410);
   } finally { await app.close(); }
 });

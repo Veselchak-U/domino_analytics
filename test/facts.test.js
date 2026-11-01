@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync } from './helpers/fixtures.js';
 import { maskOf, legalMoves, applyMove, countBits, isTerminal } from '../src/game.js';
 import { parseGame } from '../src/input.js';
 import { moveFacts, suitProfile } from '../src/facts.js';

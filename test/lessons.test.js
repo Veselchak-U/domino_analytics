@@ -91,25 +91,7 @@ test('рисунок 9: явная заданная позиция, точные
   assert.throws(() => validateLesson(broken), /стык|цепоч/i);
 });
 
-test('HTTP коллекции: без импорта, строгие параметры, кеш, отмена и повтор', async () => {
-  const app = createApp(); await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
-  const base = `http://127.0.0.1:${app.server.address().port}`;
-  const req = async (path, data, method = data ? 'POST' : 'GET') => {
-    const res = await fetch(base + path, { method, ...(data ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) } : {}) });
-    return { status: res.status, data: await res.json() };
-  };
-  const done = async job => { while (job.status === 'running') { await new Promise(r => setTimeout(r, 10)); job = (await req('/api/jobs/' + job.id)).data; } return job; };
-  try {
-    assert.equal((await req('/api/lessons')).data.lessons.length, 9);
-    assert.equal((await req('/api/lesson', { id: 'unknown' })).status, 400);
-    assert.equal((await req('/api/lesson', { id: 'figure9', mirror: 'yes' })).status, 400);
-    assert.equal((await req('/api/lesson', { id: 'figure9', hands: [] })).status, 400);
-    const first = await done((await req('/api/lesson', { id: 'figure9' })).data);
-    assert.equal(first.status, 'done');
-    assert.equal((await req('/api/lesson', { id: 'figure9' })).data.cached, true);
-    const running = (await req('/api/lesson', { id: 'figure9', mirror: true })).data;
-    assert.equal((await req('/api/jobs/' + running.id, null, 'DELETE')).data.status, 'cancelled');
-    const retry = await done((await req('/api/lesson', { id: 'figure9', mirror: true })).data);
-    assert.equal(retry.status, 'done'); assert.equal(retry.cached, false);
-  } finally { await app.close(); }
+test('сервер не вычисляет: прежний маршрут возвращает 410',async()=>{
+ const app=createApp();await new Promise(r=>app.server.listen(0,'127.0.0.1',r));
+ try{const res=await fetch('http://127.0.0.1:'+app.server.address().port+'/api/lesson',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});assert.equal(res.status,410);assert.equal((await res.json()).code,'CLIENT_COMPUTATION_REQUIRED');}finally{await app.close();}
 });

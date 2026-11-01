@@ -143,7 +143,7 @@ test('ровно 13 открывает запись с прежним забор
 
 test('мемоизация совпадает с развёрнутым перебором поздних позиций, сохраняя кратность', async () => {
   const { parseGame } = await import('../src/input.js');
-  const { readFileSync } = await import('node:fs');
+  const { readFileSync } = await import('./helpers/fixtures.js');
   const game = parseGame(readFileSync(new URL('./fixtures/real-game.json', import.meta.url), 'utf8'));
   const round = game.rounds[0], solver = createSolver(round.context);
   function terminalLengths(s, distance = 0, lengths = []) {

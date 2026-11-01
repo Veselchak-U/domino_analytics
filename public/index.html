@@ -8,7 +8,7 @@
   <script src="/theme.js"></script>
   <script src="/config.js"></script>
   <link rel="stylesheet" href="/style.css">
-  <script type="module" src="/app.js"></script>
+  <script type="module" src="/app.js?v=client-1"></script>
 </head>
 <body>
   <aside class="sidebar">
@@ -23,6 +23,8 @@
     <select id="examples"><option value="">Выберите локальный пример</option></select>
     <button id="demo" class="side-button">Открыть учебный пример ↗</button>
     <button id="open-tactics" class="side-button">Командная тактика ↗</button>
+    <label for="cache-size" class="side-heading">ПАМЯТЬ РАСЧЁТА</label>
+    <select id="cache-size"><option value="50000">Экономно · 50 000 позиций</option><option value="250000" selected>Обычно · 250 000 позиций</option><option value="2000000">Больше памяти · 2 000 000 позиций</option></select>
     <div id="game-meta" class="game-meta" hidden>
       <p><span class="variant-label">Партия:</span><span id="source-name" class="source-name"></span></p>
       <p><span class="variant-label">Вариант игры:</span><span id="rules-label"></span></p>
@@ -33,6 +35,7 @@
   <main>
     <header class="topbar"><div class="game-heading"><span id="game-source" hidden></span><span id="game-variant">Вариант игры: выберите журнал</span></div><button id="theme-toggle" class="button secondary theme-toggle" type="button" aria-pressed="false" aria-label="Включить тёмную тему">☾ Тёмная тема</button></header>
     <div id="message" class="message" role="status" aria-live="polite" hidden></div>
+    <section id="save-panel" class="panel" hidden><p id="save-status" role="status" aria-live="polite"></p><p id="save-error" class="muted"></p><button id="save-retry" class="button secondary" hidden>Повторить сохранение</button></section>
     <section id="progress" class="progress-panel" hidden>
       <div class="progress-top"><div><strong>Строим полное дерево</strong><p id="progress-text">Подготовка расчёта…</p></div><button id="cancel" class="button secondary">Отменить</button></div>
       <div class="progress-track"><span></span></div><p class="muted">Перебираем все продолжения. Число позиций заранее неизвестно, поэтому процент готовности не оценивается.</p>

@@ -15,9 +15,10 @@
     "start": "node src/start.js",
     "start:backend": "node src/server.js",
     "start:frontend": "node src/frontend.js",
-    "test": "node --test",
+    "test": "node --test --test-concurrency=1",
     "check": "node tools/check.js",
-    "analyze": "node src/cli.js"
+    "analyze": "node src/cli.js",
+    "generate:contracts": "node tools/generate-contracts.js"
   },
   "dependencies": {
     "ajv": "8.20.0"

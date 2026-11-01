@@ -18,7 +18,7 @@ test('отдельные frontend и backend: статика, API, Origin и н�
       assert.equal((await fetch(base + file)).status, 200, file);
     }
     assert.equal((await fetch(base + '/api/v1/health')).status, 200);
-    assert.equal((await fetch(base + '/api/v1/example', { method: 'POST', headers: { Origin: base, 'Content-Type': 'application/json' }, body: '{"name":"demo"}' })).status, 200);
+    assert.equal((await fetch(base + '/api/v1/examples/demo/source')).status, 200);
     const preflight = await fetch(`http://127.0.0.1:${backend.server.address().port}/api/v1/games`, { method: 'OPTIONS', headers: { Origin: base } });
     assert.equal(preflight.status, 204);
     assert.equal(preflight.headers.get('access-control-allow-origin'), base);

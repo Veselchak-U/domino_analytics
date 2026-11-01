@@ -5,7 +5,7 @@ import path from 'node:path';
 
 /** Independent static UI server. Its proxy has one configured destination. */
 export function createFrontend({ backendUrl = 'http://127.0.0.1:3211', apiBaseUrl = '/api/v1',
-  publicDir = fileURLToPath(new URL('../public/', import.meta.url)) } = {}) {
+  publicDir = fileURLToPath(new URL('../public/', import.meta.url)), allowedHosts = [] } = {}) {
   const backend = new URL(backendUrl);
   if (backend.protocol !== 'http:' || backend.username || backend.password || backend.pathname !== '/') {
     throw new Error('BACKEND_URL должен быть HTTP-адресом бэкенда без пути и пароля');
@@ -25,8 +25,8 @@ export function createFrontend({ backendUrl = 'http://127.0.0.1:3211', apiBaseUr
   const server = http.createServer(async (req, res) => {
     const port = server.address().port;
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Content-Security-Policy', `default-src 'self'; connect-src 'self' ${apiOrigin}; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; frame-ancestors 'none'; base-uri 'none'`);
-    const hosts = [`127.0.0.1:${port}`, `localhost:${port}`];
+    res.setHeader('Content-Security-Policy', `default-src 'self'; connect-src 'self' ${apiOrigin}; script-src 'self'; worker-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; frame-ancestors 'none'; base-uri 'none'`);
+    const hosts = [`127.0.0.1:${port}`, `localhost:${port}`, ...allowedHosts];
     if (!hosts.includes(req.headers.host)) return json(res, 403, 'Недопустимый адрес сервера');
     if (req.headers.origin && !hosts.map(host => `http://${host}`).includes(req.headers.origin)) return json(res, 403, 'Допустимы только локальные запросы приложения');
     if (!req.url.startsWith('/') || req.url.startsWith('//')) return json(res, 400, 'Неверный адрес запроса');
@@ -59,7 +59,7 @@ export function createFrontend({ backendUrl = 'http://127.0.0.1:3211', apiBaseUr
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end('{"status":"ok"}');
     }
-    const shared = /^\/shared\/(impact|domino|tactics)\.js$/.test(route);
+    const shared = /^\/shared\/(impact|domino|tactics|game|solver|facts|analysis|lessons|lesson-data|input|json|contract|game-schema|time|equal|lesson-manifest)\.js$/.test(route);
     const asset = route === '/' || route === '/index.html' ? 'index.html'
       : /^\/[a-z-]+\.(js|css)$/.test(route) ? route.slice(1) : null;
     if (!shared && !asset) return json(res, 404, 'Не найдено');
@@ -77,7 +77,7 @@ export function createFrontend({ backendUrl = 'http://127.0.0.1:3211', apiBaseUr
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   const port = Number(process.env.PORT ?? 3210), host = process.env.HOST ?? '127.0.0.1';
   if (!['127.0.0.1', '0.0.0.0'].includes(host)) throw new Error('Неверный HOST');
-  const frontend = createFrontend({ backendUrl: process.env.BACKEND_URL, apiBaseUrl: process.env.API_BASE_URL });
+  const frontend = createFrontend({ backendUrl: process.env.BACKEND_URL, apiBaseUrl: process.env.API_BASE_URL, allowedHosts: (process.env.DOMINO_ALLOWED_HOSTS ?? '').split(',').filter(Boolean) });
   frontend.server.on('error', error => { console.error(error.message); process.exitCode = 1; });
   frontend.server.listen(port, host, () => console.log(`Page available at: http://127.0.0.1:${port}`));
   for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => frontend.close().then(() => process.exit(0)));

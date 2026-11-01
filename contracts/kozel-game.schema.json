@@ -4,6 +4,11 @@
   "description": "Документный контракт. Структура проверяется схемой; имена, законность раздач и ходов, счёт и завершённость — последовательным воспроизведением по README.md.",
   "type": "object",
   "properties": {
+    "playedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Дата и время начала партии по RFC 3339 с часовым поясом (Z или смещением). Записывается первым полем корневого объекта, перед format."
+    },
     "format": {
       "const": "kozel-game-v1"
     },
@@ -63,6 +68,7 @@
     }
   },
   "required": [
+    "playedAt",
     "format",
     "fishVariant",
     "scoreLimit",

@@ -10,6 +10,7 @@
 !contracts/
 !contracts/kozel-game.schema.json
 !contracts/kozel-game.example.json
+!contracts/demo-game.json
 !deploy/
 !deploy/vm/
 !deploy/vm/Dockerfile

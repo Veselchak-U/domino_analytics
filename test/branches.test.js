@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync } from './helpers/fixtures.js';
 import { parseGame } from '../src/input.js';
 import { analyzeBranch } from '../src/analysis.js';
 import { legalMoves, applyMove, positionKey, stonesOf, settle } from '../src/game.js';
@@ -39,34 +39,7 @@ test('нелегальный путь, край, индекс, терминал 
   assert.throws(() => analyzeBranch(g, 0, 15, [], undefined, 'draw'), /нет продолжения/i);
   assert.throws(() => analyzeBranch(g, 0, 8, [], undefined, 'other'), /режим/i);
 });
-test('HTTP ветки: кеш, разные ключи, один worker, отмена и восстановление', { timeout: 120000 }, async () => {
-  const app = createApp(); await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
-  const base = `http://127.0.0.1:${app.server.address().port}`;
-  const request = async (path, data, method = 'POST') => {
-    const r = await fetch(base + path, { method, ...(data ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) } : {}) });
-    return { status: r.status, data: await r.json() };
-  };
-  const done = async job => {
-    while (job.status === 'running') {
-      await new Promise(r => setTimeout(r, 20)); job = (await request('/api/jobs/' + job.id, null, 'GET')).data;
-    } return job;
-  };
-  try {
-    const g = (await request('/api/import', { text })).data;
-    const args = { gameId: g.id, round: 1, position: 8, moves: [] };
-    const first = await done((await request('/api/branch', args)).data);
-    assert.equal(first.status, 'done'); assert.equal(first.result.branch.origin, 8);
-    assert.equal((await request('/api/branch', args)).data.cached, true);
-    assert.equal((await request('/api/branch', { ...args, position: -1 })).status, 400);
-    assert.equal((await request('/api/branch', { ...args, moves: [{ action: 'left', stone: '7-7' }] })).status, 400);
-    const bad = await done((await request('/api/branch', { ...args, moves: [{ action: 'pass' }] })).data);
-    assert.equal(bad.status, 'error');
-    const running = (await request('/api/branch', { ...args, position: 0 })).data;
-    assert.equal(running.status, 'running');
-    assert.equal((await request('/api/analyze', { gameId: g.id, round: 1 })).status, 409);
-    assert.equal((await request('/api/jobs/' + running.id, null, 'DELETE')).data.status, 'cancelled');
-    const retry = await done((await request('/api/branch', { ...args, example: 'win' })).data);
-    assert.equal(retry.status, 'done'); assert.equal(retry.cached, false);
-    assert.equal(retry.result.steps.at(-1).terminal, true);
-  } finally { await app.close(); }
+test('сервер не вычисляет: прежний маршрут возвращает 410',async()=>{
+ const app=createApp();await new Promise(r=>app.server.listen(0,'127.0.0.1',r));
+ try{const res=await fetch('http://127.0.0.1:'+app.server.address().port+'/api/branch',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});assert.equal(res.status,410);assert.equal((await res.json()).code,'CLIENT_COMPUTATION_REQUIRED');}finally{await app.close();}
 });

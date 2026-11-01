@@ -1,3 +1,5 @@
+import { AnalysisClient } from './analysis-client.js';
+import { lessonManifest } from '../shared/lesson-manifest.js';
 import { motifApplies } from './tactics.js';
 import { keyEpisodes, summarizePlayerQuality } from './quality.js';
 import { chainTeams, pipCoordinates } from './domino.js';
@@ -20,6 +22,24 @@ let branch = null;
 let tactics = null, tacticsCatalog = [], tacticsAttempts = [], tacticsSequence = 0;
 let libraryCursor = null;
 const apiBaseUrl = (globalThis.DOMINO_CONFIG?.apiBaseUrl ?? '/api/v1').replace(/\/$/, '');
+const client = new AnalysisClient(api, { onChange: renderSaveStatus });
+function renderSaveStatus() {
+  const states=[...client.states.values()];
+  const pending=client.pending.size;
+  const conflict=states.some(s=>s.state==='conflict');
+  const saving=states.some(s=>s.state==='uploading');
+  $('save-status').textContent=conflict?'Конфликт сохранения: данные сервера не перезаписаны.':saving?'Рассчитано локально · сохраняется на сервере…':client.unsaved?'Данные доступны на этом устройстве · не сохранены на сервере.':'Данные сохранены на сервере.';
+  $('save-panel').hidden=!client.source&&!states.length;
+  $('save-retry').hidden=!client.unsaved;
+  $('save-retry').disabled=saving;
+  const failure=states.find(s=>s.error);
+  $('save-error').textContent=failure?.error??client.source?.error??'';
+}
+async function sourceText(url) {
+  const response=await fetch(url.replace(/^\/api(?=\/)/,apiBaseUrl));
+  if(!response.ok){const data=await response.json();throw Object.assign(new Error(data.error),{status:response.status,code:data.code});}
+  return response.text();
+}
 let chartWidth = 960;
 const chartInsets = { left: 120, right: 40 };
 
@@ -43,11 +63,11 @@ function setBusy(value) {
   updateRoundButtons();
 }
 async function api(url, data, method = data === undefined ? 'GET' : 'POST') {
-  const response = await fetch(url.replace(/^\/api(?=\/)/, apiBaseUrl), { method, ...(data === undefined ? {} : {
+  const response = await fetch(url.replace(/^\/api(?=\/)/, apiBaseUrl), { signal: AbortSignal.timeout(15000), method, ...(data === undefined ? {} : {
     headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
   }) });
   const result = await response.json();
-  if (!response.ok) throw new Error(result.error ?? `Ошибка ${response.status}`);
+  if (!response.ok) throw Object.assign(new Error(result.error ?? `Ошибка ${response.status}`), { status: response.status, code: result.code });
   return result;
 }
 function percent(value, numerator, denominator) {
@@ -193,10 +213,10 @@ async function importSource(request, name) {
   setBusy(true); showMessage('Проверяем журнал и воспроизводим ходы…');
   try {
     const loaded = await request();
-    const saved = await api(`/api/games/${loaded.id}/analyses`);
-    game = loaded;
+    const text=loaded.text??await sourceText('/api/games/'+loaded.id+'/source');
+    game = await client.open(text,loaded.fileName??name);
     name = game.fileName ?? name;
-    roundAnalyses = new Map(saved.analyses.map(result => [result.number, result]));
+    roundAnalyses = new Map();
     stopQueue = false; trainingAttempts = []; training = null;
     analysis = null;
     $('dashboard').hidden = true; $('game-meta').hidden = false;
@@ -212,12 +232,12 @@ async function importSource(request, name) {
       button.addEventListener('click', () => selectRound(round.number));
       $('round-list').append(button);
     }
-    await loadLibrary();
+    try { await loadLibrary(); } catch { /* Local analysis remains available offline. */ }
     try { localStorage.setItem('domino-last-game', game.id); } catch { /* Optional preference only. */ }
     showMessage(''); setBusy(false);
     await startAnalysis();
     if (analysis) await analyzeGame();
-    await loadLibrary();
+    try { await loadLibrary(); } catch { /* Pending local analysis stays available. */ }
   } catch (e) { showMessage(e.message, true); setBusy(false); }
 }
 
@@ -246,17 +266,12 @@ async function startAnalysis() {
 
 async function requestRound(round) {
   if (roundAnalyses.has(round)) return { status: 'done', cached: true, result: roundAnalyses.get(round) };
-  let job = await api('/api/analyze', { gameId: game.id, round });
-  activeJob = job.id;
-  if (stopQueue && job.status === 'running') job = await api(`/api/jobs/${job.id}`, undefined, 'DELETE');
-  while (job.status === 'running') {
-    const stats = job.stats;
-    $('progress-text').textContent = `Раунд ${round} из ${game.rounds.length} · ${nf.format(stats.nodes)} позиций · ${nf.format(stats.hits)} из кеша · Кеш ≈ ${formatCacheSize(stats.cacheBytesEstimate ?? 0)} · ${(stats.elapsedMs / 1000).toLocaleString('ru-RU', { maximumFractionDigits: 1 })} с`;
-    await new Promise(resolve => setTimeout(resolve, 500));
-    job = await api(`/api/jobs/${job.id}`);
-  }
-  activeJob = null;
-  return job;
+  activeJob='local';
+  const result=await client.calculate('round',{round},stats=>{
+    $('progress-text').textContent=`На вашем устройстве · Раунд ${round} из ${game.rounds.length} · ${nf.format(stats.nodes)} позиций · ${nf.format(stats.hits)} из кеша · Кеш ≈ ${formatCacheSize(stats.cacheBytesEstimate??0)} · ${(stats.elapsedMs/1000).toLocaleString('ru-RU',{maximumFractionDigits:1})} с`;
+  });
+  activeJob=null;
+  return result;
 }
 
 async function analyzeGame() {
@@ -273,7 +288,7 @@ async function analyzeGame() {
       roundAnalyses.set(round.number, job.result);
       renderPlayerImpacts();
     }
-    if (stopQueue) showMessage('Расчёт партии остановлен. Готовые итоги сохранены; можно досчитать оставшиеся раунды.');
+    if (stopQueue) showMessage('Расчёт партии остановлен. Готовые итоги доступны; можно досчитать оставшиеся раунды.');
   } catch (e) { showMessage(e.message, true); }
   finally {
     activeJob = null; backgroundCalculation = false; $('progress').hidden = true; setBusy(false); renderPlayerImpacts();
@@ -362,7 +377,7 @@ async function openTactics() {
   if (busy) { showMessage('Сначала остановите текущий расчёт.'); return; }
   try {
     if (!tacticsCatalog.length) {
-      tacticsCatalog = (await api('/api/lessons')).lessons;
+      tacticsCatalog = lessonManifest.lessons;
       $('tactics-select').replaceChildren(...tacticsCatalog.map(l => {
         const option = element('option', '', l.title); option.value = l.id; return option;
       }));
@@ -379,13 +394,10 @@ function loadTactic() {
   session.running = true; session.stop = false; session.status = 'Точный расчёт упражнения…'; renderTactic();
   session.pending = (async () => {
     try {
-      let job = await api('/api/lesson', { id, mirror }); session.job = job.id;
-      if (session.stop && job.status === 'running') job = await api('/api/jobs/' + job.id, undefined, 'DELETE');
-      while (job.status === 'running') {
-        session.status = `Расчёт: ${nf.format(job.stats.nodes)} позиций · Кеш ≈ ${formatCacheSize(job.stats.cacheBytesEstimate)}`;
-        $('tactics-status').textContent = session.status;
-        await new Promise(r => setTimeout(r, 100)); job = await api('/api/jobs/' + job.id);
-      }
+      const job=await client.calculate('lesson',{id,mirror},stats=>{
+        session.status=`На вашем устройстве: ${nf.format(stats.nodes)} позиций · Кеш ≈ ${formatCacheSize(stats.cacheBytesEstimate)}`;
+        $('tactics-status').textContent=session.status;
+      });
       if (job.status === 'done' && !session.stop) {
         session.result = job.result; session.grade = null; session.choice = null; session.id = ++tacticsSequence;
         session.status = job.cached ? 'Готово, результат из кеша.' : 'Точный расчёт завершён.';
@@ -398,7 +410,7 @@ function loadTactic() {
 async function cancelTactic() {
   if (!tactics?.running) return;
   tactics.stop = true;
-  if (tactics.job) await api('/api/jobs/' + tactics.job, undefined, 'DELETE');
+  client.cancel();
 }
 function renderTactic() {
   const session = tactics, result = session.result;
@@ -518,14 +530,10 @@ function requestBranch(moves, example) {
   session.running = true; session.stop = false; session.status = 'Точный расчёт ветки…'; renderBranch();
   session.pending = (async () => {
     try {
-      let job = await api('/api/branch', { gameId: game.id, round: analysis.number, position: session.origin, moves, ...(example ? { example } : {}) });
-      session.job = job.id;
-      if (session.stop && job.status === 'running') job = await api('/api/jobs/' + job.id, undefined, 'DELETE');
-      while (job.status === 'running') {
-        session.status = `Ветка: ${nf.format(job.stats.nodes)} позиций · Кеш ≈ ${formatCacheSize(job.stats.cacheBytesEstimate)}`;
-        $('branch-status').textContent = session.status;
-        await new Promise(r => setTimeout(r, 300)); job = await api('/api/jobs/' + job.id);
-      }
+      const job=await client.calculate('branch',{round:analysis.number,position:session.origin,moves,example:example??null},stats=>{
+        session.status=`Ветка на вашем устройстве: ${nf.format(stats.nodes)} позиций · Кеш ≈ ${formatCacheSize(stats.cacheBytesEstimate)}`;
+        $('branch-status').textContent=session.status;
+      });
       if (job.status === 'done' && !session.stop) {
         session.result = job.result; session.position = job.result.steps.length - 1;
         session.status = job.cached ? 'Готово, результат из кеша.' : 'Точный расчёт завершён.';
@@ -539,7 +547,7 @@ function requestBranch(moves, example) {
 async function cancelBranch() {
   if (!branch?.running) return;
   branch.stop = true;
-  if (branch.job) await api('/api/jobs/' + branch.job, undefined, 'DELETE');
+  client.cancel();
 }
 function renderBranch() {
   $('branch-status').textContent = branch.status;
@@ -864,12 +872,12 @@ $('file').addEventListener('change', async () => {
   const file = $('file').files[0];
   if (!file) return;
   if (file.size > 5 * 1024 * 1024) { showMessage('Максимальный размер файла — 5 МБ', true); $('file').value = ''; return; }
-  await importSource(async () => api('/api/import', { text: await file.text(), name: file.name }), file.name);
+  await importSource(async () => ({ text: await file.text() }), file.name);
   $('file').value = '';
 });
 $('examples').addEventListener('change', async () => {
   const name = $('examples').value;
-  if (name) await importSource(() => api('/api/example', { name }), name);
+  if (name) await importSource(async () => ({text:await sourceText('/api/examples/'+encodeURIComponent(name)+'/source')}), name);
   $('examples').value = '';
 });
 $('saved-games').addEventListener('change', async () => {
@@ -881,7 +889,7 @@ $('library-more').addEventListener('click', async () => {
   try { await loadLibrary(true); } catch (error) { showMessage(error.message, true); }
   finally { $('library-more').disabled = busy; }
 });
-$('demo').addEventListener('click', () => importSource(() => api('/api/example', { name: 'demo' }), 'Учебная партия · 3 раунда'));
+$('demo').addEventListener('click', () => importSource(async () => ({text:await sourceText('/api/examples/demo/source')}), 'Учебная партия · 3 раунда'));
 $('analyze-game').addEventListener('click', analyzeGame);
 $('open-tactics').addEventListener('click', openTactics);
 for (const id of ['tactics-select', 'tactics-mirror']) $(id).addEventListener('change', loadTactic);
@@ -924,13 +932,11 @@ $('episode-minimum').addEventListener('input', () => {
   episodeMinimum = input.valueAsNumber;
   if (analysis) renderKeyEpisodes();
 });
-$('cancel').addEventListener('click', async () => {
-  stopQueue = true;
-  if (!activeJob) return;
-  $('cancel').disabled = true;
-  try { await api(`/api/jobs/${activeJob}`, undefined, 'DELETE'); }
-  catch (e) { showMessage(e.message, true); $('cancel').disabled = false; }
-});
+$('cancel').addEventListener('click',()=>{stopQueue=true;$('cancel').disabled=true;client.cancel();});
+$('save-retry').addEventListener('click',async()=>{await client.retry();try{await loadLibrary();}catch{/* Keep pending local data. */}});
+$('cache-size').addEventListener('change',()=>{client.computation.cacheEntries=Number($('cache-size').value);});
+window.addEventListener('beforeunload',event=>{if(client.unsaved||client.computation.active){event.preventDefault();event.returnValue='';}});
+
 for (const suffix of navigationSuffixes) {
   $(`slider${suffix}`).addEventListener('input', () => selectStep(Number($(`slider${suffix}`).value)));
   $(`first${suffix}`).addEventListener('click', () => selectStep(0));

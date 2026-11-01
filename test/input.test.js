@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync } from './helpers/fixtures.js';
 import { parseGame } from '../src/input.js';
 
 const text = readFileSync(new URL('../contracts/kozel-game.example.json', import.meta.url), 'utf8');

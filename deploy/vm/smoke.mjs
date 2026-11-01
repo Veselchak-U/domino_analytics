@@ -11,10 +11,9 @@ assert.equal(await new Promise((resolve, reject) => {
     response.resume(); resolve(response.statusCode);
   }).on('error', reject);
 }), 403);
-const imported = await fetch(base + '/api/example', {
-  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'demo' }),
-});
-assert.equal(imported.status, 200);
-const game = await imported.json();
-assert.equal(game.rounds.length, 3);
-console.log('VM smoke: интерфейс, API, демо-импорт и защита Host/Origin — OK');
+const text=await(await fetch(base+'/api/v1/examples/demo/source')).text();
+const imported=await fetch(base+'/api/v1/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,name:'Учебная партия.json'})});
+assert.ok([200,201].includes(imported.status));
+const game=await imported.json();assert.equal(game.rounds.length,3);
+assert.equal((await fetch(base+'/api/v1/health').then(r=>r.json())).computation,'client');
+console.log('VM smoke: интерфейс, хранилище, исходник demo и защита Host/Origin — OK');

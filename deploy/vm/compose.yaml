@@ -12,15 +12,15 @@ services:
       PORT: "3210"
       DATABASE_PATH: /data/domino.sqlite
       DOMINO_EXAMPLES_DIR: /data/examples
-      NODE_OPTIONS: --max-old-space-size=2304
+      NODE_OPTIONS: --max-old-space-size=192
     volumes:
       - type: bind
         source: ${DOMINO_DATA_DIR:?Укажите каталог данных}
         target: /data
     tmpfs:
       - /tmp:size=64m,mode=1777
-    mem_limit: 3g
-    cpus: 2
+    mem_limit: 384m
+    cpus: 0.5
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     stop_grace_period: 15s

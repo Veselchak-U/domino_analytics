@@ -5,8 +5,7 @@
 $ErrorActionPreference = 'Stop'
 Push-Location -LiteralPath $PSScriptRoot
 try {
-    if (-not (Get-Command node -ErrorAction SilentlyContinue) -or
-        -not (Get-Command npm.cmd -ErrorAction SilentlyContinue)) {
+    if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
         throw 'Установите Node.js 22 или новее, затем повторите запуск.'
     }
     $nodeVersion = & node -p 'process.versions.node'
@@ -14,15 +13,9 @@ try {
         throw 'Для запуска нужен Node.js 22.13 или новее.'
     }
 
-    if (-not (Test-Path -LiteralPath 'node_modules/ajv/package.json')) {
-        Write-Host 'Устанавливаем зависимости проекта...'
-        & npm.cmd ci --cache .analysis/npm-cache
-        if ($LASTEXITCODE -ne 0) { throw 'Не удалось установить зависимости.' }
-    }
-
     Write-Host 'Для остановки нажмите Ctrl+C.'
     $browserOpened = $false
-    & npm.cmd start | ForEach-Object {
+    & node src/start.js | ForEach-Object {
         Write-Host $_
         # Open only after the server reports its actual listening address.
         if ($OpenBrowser -and -not $browserOpened -and

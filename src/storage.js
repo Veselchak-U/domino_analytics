@@ -1,90 +1,66 @@
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
-
-export const RESULT_VERSION = 'rules-1.engine-1.metrics-1.schema-1';
-
-/** Single backend-owned SQLite connection. Exact counters stay JSON strings. */
+import { canonical, fault, RESULT_VERSION as CLIENT_VERSION } from '../shared/contract.js';
+export const RESULT_VERSION='rules-1.engine-1.metrics-1.schema-1';
+export const STORAGE_SCHEMA=3;
+/** The backend owns one SQLite connection and stores only sources and compact finished results. */
 export class Storage {
-  constructor(filename = ':memory:', version = RESULT_VERSION) {
-    if (filename !== ':memory:') mkdirSync(path.dirname(path.resolve(filename)), { recursive: true });
-    this.db = new DatabaseSync(filename);
-    this.version = version;
+  constructor(filename=':memory:',version=RESULT_VERSION) {
+    if(filename!==':memory:')mkdirSync(path.dirname(path.resolve(filename)),{recursive:true});
+    this.db=new DatabaseSync(filename);this.clientVersion=version===RESULT_VERSION?canonical(CLIENT_VERSION):version;
     try {
       this.db.exec('PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL;');
-      const schema = this.db.prepare('PRAGMA user_version').get().user_version;
-      if (schema > 1) throw new Error('Версия БД новее приложения; используйте совместимый релиз');
-      if (schema === 0) this.transaction(() => this.db.exec(`
-        CREATE TABLE games (id TEXT PRIMARY KEY, text TEXT NOT NULL, file_name TEXT NOT NULL,
-          summary_json TEXT NOT NULL, created_at TEXT NOT NULL);
-        CREATE TABLE results (key TEXT PRIMARY KEY, game_id TEXT REFERENCES games(id), round_number INTEGER,
-          kind TEXT NOT NULL, version TEXT NOT NULL, payload_json TEXT NOT NULL);
-        CREATE INDEX results_game ON results(game_id, version, kind, round_number);
-        CREATE TABLE jobs (id TEXT PRIMARY KEY, key TEXT NOT NULL, status TEXT NOT NULL,
-          stats_json TEXT, error TEXT, cached INTEGER NOT NULL DEFAULT 0, interrupted INTEGER NOT NULL DEFAULT 0);
-        PRAGMA user_version=1;
-      `));
-      this.db.prepare("UPDATE jobs SET status='error', interrupted=1, error=? WHERE status='running'")
-        .run('Расчёт прерван перезапуском бэкенда. Запустите расчёт повторно.');
-    } catch (error) { this.db.close(); throw error; }
+      const schema=this.db.prepare('PRAGMA user_version').get().user_version;
+      if(schema>STORAGE_SCHEMA)throw new Error('Версия БД новее приложения; используйте совместимый релиз');
+      if(schema<STORAGE_SCHEMA)this.transaction(()=>{
+        // Explicit project policy: replace old data, do not migrate or keep legacy tables.
+        for(const name of ['client_results','results','jobs','game_aliases','migration_conflicts','library_games','games'])this.db.exec('DROP TABLE IF EXISTS '+name);
+        this.db.exec(`CREATE TABLE games(id TEXT PRIMARY KEY,text TEXT NOT NULL,file_name TEXT NOT NULL,summary_json TEXT NOT NULL,created_at TEXT NOT NULL,source_hash TEXT NOT NULL);
+          CREATE TABLE results(key TEXT PRIMARY KEY,game_id TEXT REFERENCES games(id),round_number INTEGER,kind TEXT NOT NULL,version TEXT NOT NULL,envelope_json TEXT NOT NULL,payload_hash TEXT NOT NULL);
+          CREATE INDEX results_game ON results(game_id,version,kind,round_number);
+          PRAGMA user_version=3;`);
+      });
+      if(schema<STORAGE_SCHEMA)this.db.exec('VACUUM; PRAGMA wal_checkpoint(TRUNCATE);');
+    } catch(e) {this.db.close();throw e;}
   }
-  transaction(fn) {
-    this.db.exec('BEGIN IMMEDIATE');
-    try { const result = fn(); this.db.exec('COMMIT'); return result; }
-    catch (error) { this.db.exec('ROLLBACK'); throw error; }
+  transaction(fn){this.db.exec('BEGIN IMMEDIATE');try{const result=fn();this.db.exec('COMMIT');return result;}catch(e){this.db.exec('ROLLBACK');throw e;}}
+  close(){this.db.close();}
+  libraryGame(id) {
+    const row=this.db.prepare('SELECT * FROM games WHERE id=?').get(id);
+    return row?{id:row.id,text:row.text,fileName:row.file_name,createdAt:row.created_at,sourceHash:row.source_hash,summary:JSON.parse(row.summary_json)}:null;
   }
-  getGame(id) {
-    const row = this.db.prepare('SELECT * FROM games WHERE id=?').get(id);
-    return row && { id: row.id, text: row.text, fileName: row.file_name,
-      summary: JSON.parse(row.summary_json), createdAt: row.created_at };
-  }
-  putGame(id, text, summary, fileName) {
-    this.db.prepare('INSERT OR IGNORE INTO games VALUES(?,?,?,?,?)')
-      .run(id, text, fileName, JSON.stringify(summary), new Date().toISOString());
-    return this.getGame(id);
-  }
-  card(game) {
-    const completedRounds = this.db.prepare("SELECT round_number FROM results WHERE game_id=? AND version=? AND kind='round' ORDER BY round_number")
-      .all(game.id, this.version).map(row => row.round_number);
-    return { id: game.id, ...game.summary, fileName: game.fileName, createdAt: game.createdAt, completedRounds };
-  }
-  listGames(limit = 20, cursor = null) {
-    const rows = cursor
-      ? this.db.prepare('SELECT id FROM games WHERE created_at < ? OR (created_at=? AND id < ?) ORDER BY created_at DESC,id DESC LIMIT ?')
-        .all(cursor[0], cursor[0], cursor[1], limit + 1)
-      : this.db.prepare('SELECT id FROM games ORDER BY created_at DESC,id DESC LIMIT ?').all(limit + 1);
-    const games = rows.slice(0, limit).map(row => this.card(this.getGame(row.id)));
-    const last = games.at(-1);
-    return { games, nextCursor: rows.length > limit
-      ? Buffer.from(JSON.stringify([last.createdAt, last.id])).toString('base64url') : null };
-  }
-  analyses(id) {
-    return this.db.prepare("SELECT payload_json FROM results WHERE game_id=? AND kind='round' AND version=? ORDER BY round_number")
-      .all(id, this.version).map(row => JSON.parse(row.payload_json));
-  }
-  result(key) {
-    const row = this.db.prepare('SELECT payload_json FROM results WHERE key=? AND version=?').get(key, this.version);
-    return row ? JSON.parse(row.payload_json) : null;
-  }
-  saveJob(job) {
-    this.db.prepare('INSERT OR REPLACE INTO jobs VALUES(?,?,?,?,?,?,?)')
-      .run(job.id, job.key, job.status, JSON.stringify(job.stats ?? {}), job.error ?? null,
-        job.cached ? 1 : 0, job.interrupted ? 1 : 0);
-  }
-  job(id) {
-    const row = this.db.prepare('SELECT * FROM jobs WHERE id=?').get(id);
-    if (!row) return null;
-    const completed = row.status === 'done' ? this.db.prepare('SELECT payload_json,version FROM results WHERE key=?').get(row.key) : null;
-    return { id: row.id, key: row.key, status: row.status, stats: JSON.parse(row.stats_json),
-      error: row.error ?? undefined, cached: !!row.cached, interrupted: !!row.interrupted,
-      ...(completed ? { result: JSON.parse(completed.payload_json), stale: completed.version !== this.version } : {}) };
-  }
-  complete(job, result, { gameId = null, round = null, kind }) {
-    this.transaction(() => {
-      this.db.prepare('INSERT OR REPLACE INTO results VALUES(?,?,?,?,?,?)')
-        .run(job.key, gameId, round, kind, this.version, JSON.stringify(result));
-      this.saveJob({ ...job, status: 'done', stats: result.stats });
+  importSource(id,text,summary,fileName,sourceHash) {
+    return this.transaction(()=>{
+      const prior=this.libraryGame(id);
+      if(prior){if(prior.sourceHash!==sourceHash)throw fault('Та же партия содержит другой журнал',409,'GAME_SOURCE_CONFLICT');return {created:false,game:prior};}
+      this.db.prepare('INSERT INTO games VALUES(?,?,?,?,?,?)').run(id,text,fileName,JSON.stringify(summary),new Date().toISOString(),sourceHash);
+      return {created:true,game:this.libraryGame(id)};
     });
   }
-  close() { this.db.close(); }
+  libraryCard(game) {
+    const completedRounds=this.db.prepare("SELECT round_number FROM results WHERE game_id=? AND version=? AND kind='round' ORDER BY round_number").all(game.id,this.clientVersion).map(r=>r.round_number);
+    return {id:game.id,...game.summary,fileName:game.fileName,createdAt:game.createdAt,validation:'structural-only',completedRounds};
+  }
+  library(limit=20,cursor=null) {
+    const rows=cursor?this.db.prepare('SELECT id FROM games WHERE created_at < ? OR (created_at=? AND id < ?) ORDER BY created_at DESC,id DESC LIMIT ?').all(cursor[0],cursor[0],cursor[1],limit+1):this.db.prepare('SELECT id FROM games ORDER BY created_at DESC,id DESC LIMIT ?').all(limit+1);
+    const games=rows.slice(0,limit).map(r=>this.libraryCard(this.libraryGame(r.id))),last=games.at(-1);
+    return {games,nextCursor:rows.length>limit?Buffer.from(JSON.stringify([last.createdAt,last.id])).toString('base64url'):null};
+  }
+  manifest(id,limit=20,after=0) {
+    const rows=this.db.prepare("SELECT key,round_number,payload_hash FROM results WHERE game_id=? AND version=? AND kind='round' AND round_number>? ORDER BY round_number LIMIT ?").all(id,this.clientVersion,after,limit+1);
+    return {analyses:rows.slice(0,limit).map(r=>({key:r.key,number:r.round_number,payloadHash:r.payload_hash,version:CLIENT_VERSION})),nextCursor:rows.length>limit?String(rows[limit-1].round_number):null};
+  }
+  clientResult(key) {
+    const row=this.db.prepare('SELECT envelope_json FROM results WHERE key=? AND version=?').get(key,this.clientVersion);
+    return row?{...JSON.parse(row.envelope_json),cached:true}:null;
+  }
+  insertClientResult(key,envelope) {
+    const d=envelope.descriptor;
+    const prior=this.db.prepare('SELECT payload_hash,envelope_json FROM results WHERE key=?').get(key);
+    if(prior){if(prior.payload_hash!==envelope.payloadHash)throw fault('Другой результат для того же запроса',409,'RESULT_CONFLICT');return {created:false,envelope:JSON.parse(prior.envelope_json)};}
+    this.db.prepare('INSERT INTO results VALUES(?,?,?,?,?,?,?)').run(key,d.gameId??null,d.round??null,d.kind,canonical(d.version),JSON.stringify(envelope),envelope.payloadHash);
+    return {created:true,envelope};
+  }
+  publish(key,envelope) { return this.transaction(()=>this.insertClientResult(key,envelope)); }
 }

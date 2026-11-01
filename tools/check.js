@@ -6,6 +6,7 @@ function files(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? files(path.join(dir, e.name)) : [path.join(dir, e.name)]);
 }
 let failed = false;
+if (spawnSync(process.execPath, ['tools/generate-contracts.js', '--check'], { stdio: 'inherit' }).status !== 0) failed = true;
 for (const file of ['src', 'shared', 'public', 'test', 'tools'].flatMap(dir => files(dir).filter(f => !f.includes(`ast-index${path.sep}`) && f.endsWith('.js')))) {
   const result = spawnSync(process.execPath, ['--check', file], { stdio: 'inherit' });
   if (result.status !== 0) failed = true;

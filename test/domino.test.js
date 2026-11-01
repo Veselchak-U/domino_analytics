@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync } from './helpers/fixtures.js';
 import { chainTeams, pipCoordinates } from '../public/domino.js';
 import { parseGame } from '../src/input.js';
 import { stonesOf } from '../src/game.js';
